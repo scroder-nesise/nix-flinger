@@ -1,0 +1,199 @@
+-- Warning: May cause motion sickness. 
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ╔════════════════════════════════════════════╗
+-- ║          THE CHAOS GUI                     ║
+-- ╚════════════════════════════════════════════╝
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "GrokFlingGUI"
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 280, 0, 180)
+Frame.Position = UDim2.new(0.5, -140, 0.5, -90)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 16)
+UICorner.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "nix's yourself flinger"
+Title.TextColor3 = Color3.fromRGB(255, 80, 120)
+Title.TextScaled = true
+Title.Font = Enum.Font.FredokaOne
+Title.Parent = Frame
+
+local SliderFrame = Instance.new("Frame")
+SliderFrame.Size = UDim2.new(0.9, 0, 0, 40)
+SliderFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
+SliderFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+SliderFrame.Parent = Frame
+
+local SliderCorner = Instance.new("UICorner")
+SliderCorner.CornerRadius = UDim.new(0, 10)
+SliderCorner.Parent = SliderFrame
+
+local Fill = Instance.new("Frame")
+Fill.Size = UDim2.new(0.3, 0, 1, 0)
+Fill.BackgroundColor3 = Color3.fromRGB(255, 100, 140)
+Fill.BorderSizePixel = 0
+Fill.Parent = SliderFrame
+
+local FillCorner = Instance.new("UICorner")
+FillCorner.CornerRadius = UDim.new(0, 10)
+FillCorner.Parent = Fill
+
+local Label = Instance.new("TextLabel")
+Label.Size = UDim2.new(1, 0, 1, 0)
+Label.BackgroundTransparency = 1
+Label.Text = "Fling Power: 30"
+Label.TextColor3 = Color3.new(1,1,1)
+Label.TextScaled = true
+Label.Font = Enum.Font.GothamBold
+Label.Parent = SliderFrame
+
+local Dragging = false
+local Power = 30   -- 0 to 100 (insane)
+
+SliderFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		Dragging = true
+	end
+end)
+
+SliderFrame.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		Dragging = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local mousePos = input.Position.X
+		local sliderAbsPos = SliderFrame.AbsolutePosition.X
+		local sliderWidth = SliderFrame.AbsoluteSize.X
+		
+		local relative = math.clamp((mousePos - sliderAbsPos) / sliderWidth, 0, 1)
+		Power = math.floor(relative * 100)
+		
+		Fill.Size = UDim2.new(relative, 0, 1, 0)
+		Label.Text = "Fling Power: " .. Power
+	end
+end)
+
+-- ╔════════════════════════════════════════════╗
+-- ║          THE UNHOLY PHYSICS ENGINE         ║
+-- ╚════════════════════════════════════════════╝
+
+local flingConnection
+local isFlinging = false
+
+local function startFling()
+	if isFlinging then return end
+	isFlinging = true
+	
+	humanoid.PlatformStand = true
+	
+	flingConnection = RunService.Heartbeat:Connect(function(dt)
+		if not character or not rootPart or not rootPart.Parent then
+			isFlinging = false
+			return
+		end
+		
+		local intensity = Power / 20   -- scales 0→100 into something ridiculous
+		local chaos = Vector3.new(
+			math.random(-10,10) * intensity,
+			math.random(5,18)   * intensity,
+			math.random(-10,10) * intensity
+		)
+		
+		-- The famous "network ownership + velocity spam" combo
+		rootPart.Velocity = chaos * 35 + Vector3.new(0, math.sin(tick()*8)*80*intensity, 0)
+		rootPart.RotVelocity = Vector3.new(
+			math.random(-200,200)*intensity,
+			math.random(-300,300)*intensity,
+			math.random(-200,200)*intensity
+		)
+		
+		-- Tiny random angular impulse spice
+		if math.random(1,8) == 1 then
+			rootPart.AssemblyAngularVelocity += Vector3.new(
+				math.random(-400,400),
+				math.random(-600,600),
+				math.random(-400,400)
+			)
+		end
+	end)
+end
+
+local function stopFling()
+	if not isFlinging then return end
+	isFlinging = false
+	if flingConnection then flingConnection:Disconnect() end
+	
+	humanoid.PlatformStand = false
+	
+	-- Gentle landing attempt (lol good luck)
+	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(rootPart, tweenInfo, {Velocity = Vector3.new(0,0,0)}):Play()
+end
+
+-- Big red button of doom
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0.8, 0, 0, 50)
+ToggleButton.Position = UDim2.new(0.1, 0, 0.65, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 90)
+ToggleButton.Text = "fling yourself"
+ToggleButton.TextColor3 = Color3.new(1,1,1)
+ToggleButton.Font = Enum.Font.FredokaOne
+ToggleButton.TextSize = 28
+ToggleButton.Parent = Frame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 12)
+btnCorner.Parent = ToggleButton
+
+local active = false
+
+ToggleButton.MouseButton1Click:Connect(function()
+	active = not active
+	
+	if active then
+		ToggleButton.Text = "click again to stop"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 220, 100)
+		startFling()
+	else
+		ToggleButton.Text = "fling yourself"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 90)
+		stopFling()
+	end
+end)
+
+-- Small quality-of-life: stop flinging when character dies/resets
+player.CharacterAdded:Connect(function(newChar)
+	character = newChar
+	humanoid = newChar:WaitForChild("Humanoid")
+	rootPart = newChar:WaitForChild("HumanoidRootPart")
+	
+	if active then
+		stopFling()
+		wait(0.5)
+		startFling()
+	end
+end)
