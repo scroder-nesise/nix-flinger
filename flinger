@@ -132,7 +132,7 @@ UserInputService.InputChanged:Connect(function(input)
         local sliderWidth = SliderFrame.AbsoluteSize.X
         
         local relative = math.clamp((mousePos - sliderAbsPos) / sliderWidth, 0, 1)
-        Power = math.floor(relative * 1000)
+        Power = math.floor(relative * 250)
         
         Fill.Size = UDim2.new(relative, 0, 1, 0)
         Label.Text = "fling power: " .. Power
@@ -158,7 +158,7 @@ local function startFling()
             return
         end
         
-        local intensity = Power / 30
+        local intensity = Power / 45
         local chaos = Vector3.new(
             math.random(-10,10) * intensity,
             math.random(5,18)   * intensity,
