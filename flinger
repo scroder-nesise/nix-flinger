@@ -111,7 +111,7 @@ Label.Font = Enum.Font.GothamBold
 Label.Parent = SliderFrame
 
 local DraggingSlider = false
-local Power = 30   -- 0 to 100 (insane)
+local Power = 30   -- 0 to 250
 
 SliderFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -140,88 +140,81 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- ╔════════════════════════════════════════════╗
--- ║          THE UNHOLY PHYSICS ENGINE         ║
+-- ║          ONE-TIME FLING BURST + LONG SPIN  ║
 -- ╚════════════════════════════════════════════╝
 
-local flingConnection
-local isFlinging = false
-
-local function startFling()
-    if isFlinging then return end
-    isFlinging = true
+local function doFlingBurst()
+    if not character or not rootPart or not rootPart.Parent then return end
     
-    humanoid.PlatformStand = true
+    humanoid.PlatformStand = true  -- Ragdoll mode during fling
     
-    flingConnection = RunService.Heartbeat:Connect(function(dt)
-        if not character or not rootPart or not rootPart.Parent then
-            isFlinging = false
-            return
-        end
+    local intensity = Power / 25
+    
+    -- Big initial impulse with upward bias
+    local flingDir = Vector3.new(
+        math.random(-12,12) * intensity,
+        math.random(15,28)  * intensity,   -- Strong up
+        math.random(-12,12) * intensity
+    )
+    
+    rootPart.Velocity = flingDir * 55
+    
+    rootPart.RotVelocity = Vector3.new(
+        math.random(-500,500) * intensity,
+        math.random(-800,800) * intensity,
+        math.random(-500,500) * intensity
+    )
+    
+    -- Extra wild spin kick
+    rootPart.AssemblyAngularVelocity = Vector3.new(
+        math.random(-1000,1000),
+        math.random(-1500,1500),
+        math.random(-1000,1000)
+    )
+    
+    -- Longer air/spin time before slowdown (was ~1.4s, now ~2.8–3.5s)
+    task.delay(2.8 + math.random() * 0.7, function()
+        if not character or not rootPart or not rootPart.Parent then return end
         
-        local intensity = Power / 45
-        local chaos = Vector3.new(
-            math.random(-10,10) * intensity,
-            math.random(5,18)   * intensity,
-            math.random(-10,10) * intensity
+        local tweenInfo = TweenInfo.new(
+            1.2,                    -- Slowdown duration
+            Enum.EasingStyle.Quad,
+            Enum.EasingDirection.Out
         )
         
-        rootPart.Velocity = chaos * 35 + Vector3.new(0, math.sin(tick()*8)*80*intensity, 0)
-        rootPart.RotVelocity = Vector3.new(
-            math.random(-200,200)*intensity,
-            math.random(-300,300)*intensity,
-            math.random(-200,200)*intensity
-        )
+        -- Gradually kill velocity and spin
+        TweenService:Create(rootPart, tweenInfo, {
+            Velocity = Vector3.new(),
+            RotVelocity = Vector3.new(),
+            AssemblyAngularVelocity = Vector3.new()
+        }):Play()
         
-        if math.random(1,8) == 1 then
-            rootPart.AssemblyAngularVelocity += Vector3.new(
-                math.random(-400,400),
-                math.random(-600,600),
-                math.random(-400,400)
-            )
-        end
+        -- Restore control after slowdown
+        task.delay(1.3, function()
+            if humanoid and humanoid.Parent then
+                humanoid.PlatformStand = false
+            end
+        end)
     end)
 end
 
-local function stopFling()
-    if not isFlinging then return end
-    isFlinging = false
-    if flingConnection then flingConnection:Disconnect() end
-    
-    humanoid.PlatformStand = false
-    
-    local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    TweenService:Create(rootPart, tweenInfo, {Velocity = Vector3.new(0,0,0)}):Play()
-end
-
--- Toggle button
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0.8, 0, 0, 50)
-ToggleButton.Position = UDim2.new(0.1, 0, 0.65, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 90)
-ToggleButton.Text = "fling yourself"
-ToggleButton.TextColor3 = Color3.new(1,1,1)
-ToggleButton.Font = Enum.Font.FredokaOne
-ToggleButton.TextSize = 28
-ToggleButton.Parent = Frame
+-- Button (one fling per click)
+local ActionButton = Instance.new("TextButton")
+ActionButton.Size = UDim2.new(0.8, 0, 0, 50)
+ActionButton.Position = UDim2.new(0.1, 0, 0.65, 0)
+ActionButton.BackgroundColor3 = Color3.fromRGB(220, 60, 90)
+ActionButton.Text = "fling yourself!"
+ActionButton.TextColor3 = Color3.new(1,1,1)
+ActionButton.Font = Enum.Font.FredokaOne
+ActionButton.TextSize = 28
+ActionButton.Parent = Frame
 
 local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 12)
-btnCorner.Parent = ToggleButton
+btnCorner.Parent = ActionButton
 
-local active = false
-
-ToggleButton.MouseButton1Click:Connect(function()
-    active = not active
-    
-    if active then
-        ToggleButton.Text = "click again to stop"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 220, 100)
-        startFling()
-    else
-        ToggleButton.Text = "fling yourself"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 90)
-        stopFling()
-    end
+ActionButton.MouseButton1Click:Connect(function()
+    doFlingBurst()
 end)
 
 -- Reset handling
@@ -229,12 +222,4 @@ player.CharacterAdded:Connect(function(newChar)
     character = newChar
     humanoid = newChar:WaitForChild("Humanoid")
     rootPart = newChar:WaitForChild("HumanoidRootPart")
-    
-    if active then
-        stopFling()
-        wait(0.5)
-        startFling()
-    end
 end)
-
-print("nix's yourself flinger ready")
