@@ -29,6 +29,7 @@ UICorner.CornerRadius = UDim.new(0, 16)
 UICorner.Parent = Frame
 
 -- ── DRAGGABLE LOGIC ──
+-- FIX 3: Separate flags so slider drag doesn't move the frame
 local dragging = false
 local dragInput
 local dragStart
@@ -45,11 +46,14 @@ local function update(input)
 end
 
 Frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    -- Only start frame drag if the slider is NOT being dragged
+    if (input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch)
+        and not DraggingSlider then  -- guard added
         dragging = true
         dragStart = input.Position
         startPos = Frame.Position
-        
+
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -59,13 +63,14 @@ Frame.InputBegan:Connect(function(input)
 end)
 
 Frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input == dragInput then
+    if dragging and input == dragInput and not DraggingSlider then
         update(input)
     end
 end)
@@ -110,31 +115,35 @@ Label.TextScaled = true
 Label.Font = Enum.Font.GothamBold
 Label.Parent = SliderFrame
 
-local DraggingSlider = false
-local Power = 30   -- 0 to 250
+-- FIX 3: Declared before Frame.InputBegan so the guard above can read it
+DraggingSlider = false
+local Power = 30
 
 SliderFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
         DraggingSlider = true
     end
 end)
 
 SliderFrame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
         DraggingSlider = false
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if DraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local mousePos = input.Position.X
+    if DraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch) then
+        local mousePos    = input.Position.X
         local sliderAbsPos = SliderFrame.AbsolutePosition.X
-        local sliderWidth = SliderFrame.AbsoluteSize.X
-        
+        local sliderWidth  = SliderFrame.AbsoluteSize.X
+
         local relative = math.clamp((mousePos - sliderAbsPos) / sliderWidth, 0, 1)
         Power = math.floor(relative * 250)
-        
-        Fill.Size = UDim2.new(relative, 0, 1, 0)
+
+        Fill.Size  = UDim2.new(relative, 0, 1, 0)
         Label.Text = "fling power: " .. Power
     end
 end)
@@ -143,62 +152,78 @@ end)
 -- ║          ONE-TIME FLING BURST + LONG SPIN  ║
 -- ╚════════════════════════════════════════════╝
 
+-- FIX 5: Cooldown so spamming doesn't stack impulses
+local onCooldown = false
+
 local function doFlingBurst()
+    if onCooldown then return end
     if not character or not rootPart or not rootPart.Parent then return end
-    
-    humanoid.PlatformStand = true  -- Ragdoll mode during fling
-    
-    local intensity = Power / 25
-    
-    -- Big initial impulse with upward bias
-    local flingDir = Vector3.new(
-        math.random(-12,12) * intensity,
-        math.random(15,28)  * intensity,   -- Strong up
-        math.random(-12,12) * intensity
-    )
-    
-    rootPart.Velocity = flingDir * 55
-    
-    rootPart.RotVelocity = Vector3.new(
-        math.random(-500,500) * intensity,
-        math.random(-800,800) * intensity,
-        math.random(-500,500) * intensity
-    )
-    
-    -- Extra wild spin kick
+
+    onCooldown = true
+
+    local intensity = math.max(Power, 1) / 25
+
+    -- FIX 4: Disable humanoid state for proper ragdoll on both R6 and R15
+    humanoid.PlatformStand = true
+    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+    -- FIX 1: Use AssemblyLinearVelocity instead of deprecated .Velocity
+    rootPart.AssemblyLinearVelocity = Vector3.new(
+        math.random(-12, 12) * intensity,
+        math.random(15,  28) * intensity,
+        math.random(-12, 12) * intensity
+    ) * 55
+
+    -- FIX 1: Use AssemblyAngularVelocity for spin (single assignment, no conflict)
     rootPart.AssemblyAngularVelocity = Vector3.new(
-        math.random(-1000,1000),
-        math.random(-1500,1500),
-        math.random(-1000,1000)
+        math.random(-1000, 1000) * intensity,
+        math.random(-1500, 1500) * intensity,
+        math.random(-1000, 1000) * intensity
     )
-    
-    -- Longer air/spin time before slowdown (was ~1.4s, now ~2.8–3.5s)
-    task.delay(2.8 + math.random() * 0.7, function()
-        if not character or not rootPart or not rootPart.Parent then return end
-        
-        local tweenInfo = TweenInfo.new(
-            1.2,                    -- Slowdown duration
-            Enum.EasingStyle.Quad,
-            Enum.EasingDirection.Out
-        )
-        
-        -- Gradually kill velocity and spin
-        TweenService:Create(rootPart, tweenInfo, {
-            Velocity = Vector3.new(),
-            RotVelocity = Vector3.new(),
-            AssemblyAngularVelocity = Vector3.new()
-        }):Play()
-        
-        -- Restore control after slowdown
-        task.delay(1.3, function()
+
+    -- FIX 2: Lerp angular velocity manually since TweenService can't tween it
+    local spinDuration  = 2.8 + math.random() * 0.7
+    local slowDuration  = 1.2
+    local spinStart     = tick()
+    local initialAngVel = rootPart.AssemblyAngularVelocity
+
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not rootPart or not rootPart.Parent then
+            conn:Disconnect()
+            return
+        end
+
+        local elapsed = tick() - spinStart
+
+        if elapsed < spinDuration then
+            -- Leave spin untouched during the air phase
+
+        elseif elapsed < spinDuration + slowDuration then
+            -- Lerp angular velocity to zero over slowDuration
+            local t = (elapsed - spinDuration) / slowDuration
+            t = t * t * (3 - 2 * t) -- smoothstep
+            rootPart.AssemblyAngularVelocity = initialAngVel:Lerp(Vector3.zero, t)
+
+        else
+            -- Done: zero out and restore humanoid
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+            conn:Disconnect()
+
             if humanoid and humanoid.Parent then
                 humanoid.PlatformStand = false
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
             end
-        end)
+
+            -- FIX 5: Release cooldown after full recovery
+            task.delay(0.5, function()
+                onCooldown = false
+            end)
+        end
     end)
 end
 
--- Button (one fling per click)
+-- Button
 local ActionButton = Instance.new("TextButton")
 ActionButton.Size = UDim2.new(0.8, 0, 0, 50)
 ActionButton.Position = UDim2.new(0.1, 0, 0.65, 0)
@@ -213,13 +238,12 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 12)
 btnCorner.Parent = ActionButton
 
-ActionButton.MouseButton1Click:Connect(function()
-    doFlingBurst()
-end)
+ActionButton.MouseButton1Click:Connect(doFlingBurst)
 
 -- Reset handling
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
-    humanoid = newChar:WaitForChild("Humanoid")
-    rootPart = newChar:WaitForChild("HumanoidRootPart")
+    humanoid  = newChar:WaitForChild("Humanoid")
+    rootPart  = newChar:WaitForChild("HumanoidRootPart")
+    onCooldown = false
 end)
