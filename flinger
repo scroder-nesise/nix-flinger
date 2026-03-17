@@ -161,7 +161,7 @@ local function doFlingBurst()
 
     onCooldown = true
 
-    local intensity = math.max(Power, 1) / 25
+    local intensity = math.max(Power, 1) / 375
 
     -- FIX 4: Disable humanoid state for proper ragdoll on both R6 and R15
     humanoid.PlatformStand = true
