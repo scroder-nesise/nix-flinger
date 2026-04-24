@@ -1,249 +1,1269 @@
 local Players = game:GetService("Players")
+
 local UserInputService = game:GetService("UserInputService")
+
 local RunService = game:GetService("RunService")
+
 local TweenService = game:GetService("TweenService")
 
+
+
 local player = Players.LocalPlayer
+
 local character = player.Character or player.CharacterAdded:Wait()
+
 local humanoid = character:WaitForChild("Humanoid")
+
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
+
+
 -- ╔════════════════════════════════════════════╗
--- ║          THE CHAOS GUI (NOW DRAGGABLE!)    ║
+
+-- ║       NIX'S YOURSELF FLINGER  V2          ║
+
 -- ╚════════════════════════════════════════════╝
 
+
+
+local C = {
+
+    BG      = Color3.fromRGB(12, 11, 18),
+
+    Panel   = Color3.fromRGB(20, 18, 30),
+
+    Surface = Color3.fromRGB(28, 25, 42),
+
+    Input   = Color3.fromRGB(22, 20, 34),
+
+    Border  = Color3.fromRGB(55, 48, 80),
+
+    Pink    = Color3.fromRGB(255, 75, 120),
+
+    Purple  = Color3.fromRGB(160, 90, 255),
+
+    Green   = Color3.fromRGB(55, 220, 130),
+
+    Red     = Color3.fromRGB(240, 65, 75),
+
+    TextOn  = Color3.fromRGB(220, 215, 235),
+
+    TextSub = Color3.fromRGB(120, 110, 148),
+
+    TextDim = Color3.fromRGB(58,  52,  80),
+
+}
+
+
+
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Name = "nix's yourself flinger"
+
+ScreenGui.Name          = "NixFlingerV2"
+
+ScreenGui.ResetOnSpawn  = false
+
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+ScreenGui.Parent        = player:WaitForChild("PlayerGui")
+
+
+
+-- Main frame  240 × 148
+
+local W, H = 240, 148
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 280, 0, 180)
-Frame.Position = UDim2.new(0.5, -140, 0.5, -90)
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-Frame.BorderSizePixel = 0
-Frame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 16)
-UICorner.Parent = Frame
+Frame.Name             = "Main"
 
--- ── DRAGGABLE LOGIC ──
--- FIX 3: Separate flags so slider drag doesn't move the frame
-local dragging = false
-local dragInput
-local dragStart
-local startPos
+Frame.Size             = UDim2.new(0, W, 0, H)
 
-local function update(input)
-    local delta = input.Position - dragStart
-    Frame.Position = UDim2.new(
-        startPos.X.Scale,
-        startPos.X.Offset + delta.X,
-        startPos.Y.Scale,
-        startPos.Y.Offset + delta.Y
-    )
-end
+Frame.Position         = UDim2.new(0.5, -W/2, 0.5, -H/2)
 
-Frame.InputBegan:Connect(function(input)
-    -- Only start frame drag if the slider is NOT being dragged
-    if (input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch)
-        and not DraggingSlider then  -- guard added
-        dragging = true
-        dragStart = input.Position
-        startPos = Frame.Position
+Frame.BackgroundColor3 = C.BG
 
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
+Frame.BackgroundTransparency = 0.06
 
-Frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
+Frame.BorderSizePixel  = 0
 
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input == dragInput and not DraggingSlider then
-        update(input)
-    end
-end)
+Frame.ClipsDescendants = true
+
+Frame.Parent           = ScreenGui
+
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 14)
+
+
+
+local fStroke = Instance.new("UIStroke", Frame)
+
+fStroke.Thickness       = 1.3
+
+fStroke.Color           = C.Border
+
+fStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+
+
+-- Pink–purple gradient top bar
+
+local topBar = Instance.new("Frame")
+
+topBar.Size             = UDim2.new(1, 0, 0, 3)
+
+topBar.BackgroundColor3 = C.Pink
+
+topBar.BorderSizePixel  = 0
+
+topBar.ZIndex           = 4
+
+topBar.Parent           = Frame
+
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 14)
+
+
+
+local topGrad = Instance.new("UIGradient", topBar)
+
+topGrad.Color = ColorSequence.new({
+
+    ColorSequenceKeypoint.new(0, C.Pink),
+
+    ColorSequenceKeypoint.new(1, C.Purple),
+
+})
+
+
+
+-- ── Header row ──
+
+local header = Instance.new("Frame")
+
+header.Size             = UDim2.new(1, 0, 0, 36)
+
+header.BackgroundTransparency = 1
+
+header.Parent           = Frame
+
+
+
+-- Gear button (top-left — opens settings)
+
+local gearBtn = Instance.new("TextButton")
+
+gearBtn.Size             = UDim2.new(0, 28, 0, 28)
+
+gearBtn.Position         = UDim2.new(0, 7, 0.5, -14)
+
+gearBtn.BackgroundColor3 = C.Surface
+
+gearBtn.Text             = "⚙"
+
+gearBtn.TextColor3       = C.TextSub
+
+gearBtn.TextSize         = 14
+
+gearBtn.Font             = Enum.Font.GothamBold
+
+gearBtn.BorderSizePixel  = 0
+
+gearBtn.ZIndex           = 3
+
+gearBtn.Parent           = header
+
+Instance.new("UICorner", gearBtn).CornerRadius = UDim.new(0, 7)
+
+
 
 -- Title
+
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
+
+Title.Size              = UDim2.new(1, -80, 1, 0)
+
+Title.Position          = UDim2.new(0, 42, 0, 0)
+
 Title.BackgroundTransparency = 1
-Title.Text = "nix's yourself flinger"
-Title.TextColor3 = Color3.fromRGB(255, 80, 120)
-Title.TextScaled = true
-Title.Font = Enum.Font.FredokaOne
-Title.Parent = Frame
 
--- Slider
+Title.Text              = "nix's flinger"
+
+Title.TextColor3        = C.TextOn
+
+Title.TextSize          = 14
+
+Title.Font              = Enum.Font.GothamBold
+
+Title.TextXAlignment    = Enum.TextXAlignment.Left
+
+Title.ZIndex            = 3
+
+Title.Parent            = header
+
+
+
+-- Cooldown indicator dot (top-right)
+
+local cdDot = Instance.new("Frame")
+
+cdDot.Size             = UDim2.new(0, 7, 0, 7)
+
+cdDot.Position         = UDim2.new(1, -16, 0.5, -3.5)
+
+cdDot.BackgroundColor3 = C.Green
+
+cdDot.BorderSizePixel  = 0
+
+cdDot.ZIndex           = 3
+
+cdDot.Parent           = header
+
+Instance.new("UICorner", cdDot).CornerRadius = UDim.new(1, 0)
+
+
+
+local cdLabel = Instance.new("TextLabel")
+
+cdLabel.Size              = UDim2.new(0, 36, 0, 14)
+
+cdLabel.Position          = UDim2.new(1, -52, 0.5, -7)
+
+cdLabel.BackgroundTransparency = 1
+
+cdLabel.Text              = "READY"
+
+cdLabel.TextColor3        = C.Green
+
+cdLabel.TextSize          = 9
+
+cdLabel.Font              = Enum.Font.GothamBold
+
+cdLabel.ZIndex            = 3
+
+cdLabel.Parent            = header
+
+
+
+-- ── Divider ──
+
+local div = Instance.new("Frame")
+
+div.Size             = UDim2.new(1, -16, 0, 1)
+
+div.Position         = UDim2.new(0, 8, 0, 36)
+
+div.BackgroundColor3 = C.Border
+
+div.BackgroundTransparency = 0.45
+
+div.BorderSizePixel  = 0
+
+div.Parent           = Frame
+
+
+
+-- ── Slider ──
+
 local SliderFrame = Instance.new("Frame")
-SliderFrame.Size = UDim2.new(0.9, 0, 0, 40)
-SliderFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
-SliderFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-SliderFrame.Parent = Frame
 
-local SliderCorner = Instance.new("UICorner")
-SliderCorner.CornerRadius = UDim.new(0, 10)
-SliderCorner.Parent = SliderFrame
+SliderFrame.Size             = UDim2.new(1, -20, 0, 28)
+
+SliderFrame.Position         = UDim2.new(0, 10, 0, 44)
+
+SliderFrame.BackgroundColor3 = C.Surface
+
+SliderFrame.BorderSizePixel  = 0
+
+SliderFrame.Parent           = Frame
+
+Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0, 8)
+
+
 
 local Fill = Instance.new("Frame")
-Fill.Size = UDim2.new(0.3, 0, 1, 0)
-Fill.BackgroundColor3 = Color3.fromRGB(255, 100, 140)
-Fill.BorderSizePixel = 0
-Fill.Parent = SliderFrame
 
-local FillCorner = Instance.new("UICorner")
-FillCorner.CornerRadius = UDim.new(0, 10)
-FillCorner.Parent = Fill
+Fill.Size             = UDim2.new(0.12, 0, 1, 0)
+
+Fill.BackgroundColor3 = C.Pink
+
+Fill.BorderSizePixel  = 0
+
+Fill.Parent           = SliderFrame
+
+Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 8)
+
+
+
+local fillGrad = Instance.new("UIGradient", Fill)
+
+fillGrad.Color = ColorSequence.new({
+
+    ColorSequenceKeypoint.new(0, C.Pink),
+
+    ColorSequenceKeypoint.new(1, C.Purple),
+
+})
+
+
 
 local Label = Instance.new("TextLabel")
-Label.Size = UDim2.new(1, 0, 1, 0)
-Label.BackgroundTransparency = 1
-Label.Text = "Fling Power: 30"
-Label.TextColor3 = Color3.new(1,1,1)
-Label.TextScaled = true
-Label.Font = Enum.Font.GothamBold
-Label.Parent = SliderFrame
 
--- FIX 3: Declared before Frame.InputBegan so the guard above can read it
+Label.Size              = UDim2.new(1, 0, 1, 0)
+
+Label.BackgroundTransparency = 1
+
+Label.Text              = "Power: 30"
+
+Label.TextColor3        = C.TextOn
+
+Label.TextSize          = 12
+
+Label.Font              = Enum.Font.GothamBold
+
+Label.ZIndex            = 2
+
+Label.Parent            = SliderFrame
+
+
+
+-- Power value badge (right edge of slider)
+
+local powerBadge = Instance.new("TextLabel")
+
+powerBadge.Size              = UDim2.new(0, 34, 0, 18)
+
+powerBadge.Position          = UDim2.new(1, -38, 0.5, -9)
+
+powerBadge.BackgroundColor3  = C.Input
+
+powerBadge.Text              = "30"
+
+powerBadge.TextColor3        = C.Pink
+
+powerBadge.TextSize          = 10
+
+powerBadge.Font              = Enum.Font.GothamBold
+
+powerBadge.ZIndex            = 3
+
+powerBadge.Parent            = SliderFrame
+
+Instance.new("UICorner", powerBadge).CornerRadius = UDim.new(0, 5)
+
+
+
+-- ── Fling button ──
+
+local ActionButton = Instance.new("TextButton")
+
+ActionButton.Size             = UDim2.new(1, -20, 0, 42)
+
+ActionButton.Position         = UDim2.new(0, 10, 0, 82)
+
+ActionButton.BackgroundColor3 = C.Pink
+
+ActionButton.Text             = "✦  fling yourself!"
+
+ActionButton.TextColor3       = Color3.new(1, 1, 1)
+
+ActionButton.TextSize         = 15
+
+ActionButton.Font             = Enum.Font.GothamBold
+
+ActionButton.BorderSizePixel  = 0
+
+ActionButton.Parent           = Frame
+
+Instance.new("UICorner", ActionButton).CornerRadius = UDim.new(0, 10)
+
+
+
+local btnGrad = Instance.new("UIGradient", ActionButton)
+
+btnGrad.Color = ColorSequence.new({
+
+    ColorSequenceKeypoint.new(0, C.Pink),
+
+    ColorSequenceKeypoint.new(1, C.Purple),
+
+})
+
+
+
+-- Hint label
+
+local hint = Instance.new("TextLabel")
+
+hint.Size              = UDim2.new(1, 0, 0, 14)
+
+hint.Position          = UDim2.new(0, 0, 1, -16)
+
+hint.BackgroundTransparency = 1
+
+hint.Text              = "drag to move"
+
+hint.TextColor3        = C.TextDim
+
+hint.TextSize          = 9
+
+hint.Font              = Enum.Font.Gotham
+
+hint.Parent            = Frame
+
+
+
+-- ── Cooldown UI helper ──
+
+local function setCooldownUI(active)
+
+    TweenService:Create(cdDot,   TweenInfo.new(0.15), {
+
+        BackgroundColor3 = active and C.Red or C.Green
+
+    }):Play()
+
+    TweenService:Create(ActionButton, TweenInfo.new(0.15), {
+
+        BackgroundColor3 = active and C.Surface or C.Pink
+
+    }):Play()
+
+    cdLabel.Text       = active and "WAIT"  or "READY"
+
+    cdLabel.TextColor3 = active and C.Red   or C.Green
+
+    ActionButton.Text  = active and "⏳  cooling down…" or "✦  fling yourself!"
+
+end
+
+
+
+-- =============================================
+
+-- SETTINGS PANEL  (200 × 290, scrollable)
+
+-- =============================================
+
+local SF = Instance.new("Frame")
+
+SF.Name             = "Settings"
+
+SF.Size             = UDim2.new(0, 200, 0, 290)
+
+SF.Position         = UDim2.new(0.5, -100, 0.5, -145)
+
+SF.BackgroundColor3 = C.BG
+
+SF.BackgroundTransparency = 0.06
+
+SF.BorderSizePixel  = 0
+
+SF.Visible          = false
+
+SF.ZIndex           = 10
+
+SF.Parent           = ScreenGui
+
+Instance.new("UICorner", SF).CornerRadius = UDim.new(0, 13)
+
+local sfStroke = Instance.new("UIStroke", SF)
+
+sfStroke.Color     = C.Border
+
+sfStroke.Thickness = 1.3
+
+
+
+local sfTitle = Instance.new("TextLabel")
+
+sfTitle.Size              = UDim2.new(1, 0, 0, 30)
+
+sfTitle.BackgroundTransparency = 1
+
+sfTitle.Text              = "Settings"
+
+sfTitle.TextColor3        = C.TextOn
+
+sfTitle.TextSize          = 13
+
+sfTitle.Font              = Enum.Font.GothamBold
+
+sfTitle.ZIndex            = 12
+
+sfTitle.Parent            = SF
+
+
+
+local sfClose = Instance.new("TextButton")
+
+sfClose.Size             = UDim2.new(0, 24, 0, 24)
+
+sfClose.Position         = UDim2.new(1, -28, 0, 3)
+
+sfClose.BackgroundTransparency = 1
+
+sfClose.Text             = "✕"
+
+sfClose.TextColor3       = C.Red
+
+sfClose.TextSize         = 15
+
+sfClose.Font             = Enum.Font.GothamBold
+
+sfClose.ZIndex           = 12
+
+sfClose.Parent           = SF
+
+
+
+local sfDiv = Instance.new("Frame")
+
+sfDiv.Size             = UDim2.new(1, -16, 0, 1)
+
+sfDiv.Position         = UDim2.new(0, 8, 0, 29)
+
+sfDiv.BackgroundColor3 = C.Border
+
+sfDiv.BackgroundTransparency = 0.4
+
+sfDiv.BorderSizePixel  = 0
+
+sfDiv.ZIndex           = 11
+
+sfDiv.Parent           = SF
+
+
+
+-- Scroll area
+
+local sScroll = Instance.new("ScrollingFrame")
+
+sScroll.Size                 = UDim2.new(1, 0, 1, -30)
+
+sScroll.Position             = UDim2.new(0, 0, 0, 30)
+
+sScroll.BackgroundTransparency = 1
+
+sScroll.BorderSizePixel      = 0
+
+sScroll.ScrollBarThickness   = 3
+
+sScroll.ScrollBarImageColor3 = C.Border
+
+sScroll.CanvasSize           = UDim2.new(0, 0, 0, 340)
+
+sScroll.ScrollingDirection   = Enum.ScrollingDirection.Y
+
+sScroll.ZIndex               = 10
+
+sScroll.Parent               = SF
+
+
+
+-- Settings helpers
+
+local function secLabel(text, color, y)
+
+    local l = Instance.new("TextLabel")
+
+    l.Size              = UDim2.new(1, -16, 0, 15)
+
+    l.Position          = UDim2.new(0, 12, 0, y)
+
+    l.BackgroundTransparency = 1
+
+    l.Text              = text
+
+    l.TextColor3        = color
+
+    l.TextSize          = 10
+
+    l.Font              = Enum.Font.GothamBold
+
+    l.TextXAlignment    = Enum.TextXAlignment.Left
+
+    l.Parent            = sScroll
+
+end
+
+
+
+local function secDiv(y)
+
+    local d = Instance.new("Frame")
+
+    d.Size             = UDim2.new(1, -16, 0, 1)
+
+    d.Position         = UDim2.new(0, 8, 0, y)
+
+    d.BackgroundColor3 = C.Border
+
+    d.BackgroundTransparency = 0.45
+
+    d.BorderSizePixel  = 0
+
+    d.Parent           = sScroll
+
+end
+
+
+
+local function makeRow(labelText, yPos)
+
+    local l = Instance.new("TextLabel")
+
+    l.Size              = UDim2.new(0.58, 0, 0, 22)
+
+    l.Position          = UDim2.new(0, 12, 0, yPos)
+
+    l.BackgroundTransparency = 1
+
+    l.Text              = labelText
+
+    l.TextColor3        = C.TextSub
+
+    l.TextSize          = 11
+
+    l.Font              = Enum.Font.Gotham
+
+    l.TextXAlignment    = Enum.TextXAlignment.Left
+
+    l.Parent            = sScroll
+
+    return l
+
+end
+
+
+
+local function makeBox(default, yPos, onChanged)
+
+    local b = Instance.new("TextBox")
+
+    b.Size             = UDim2.new(0.36, 0, 0, 22)
+
+    b.Position         = UDim2.new(0.62, 0, 0, yPos)
+
+    b.BackgroundColor3 = C.Input
+
+    b.Text             = tostring(default)
+
+    b.TextColor3       = C.TextOn
+
+    b.TextSize         = 11
+
+    b.Font             = Enum.Font.Gotham
+
+    b.Parent           = sScroll
+
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+
+    b.FocusLost:Connect(function()
+
+        local v = tonumber(b.Text)
+
+        if v then
+
+            onChanged(v)
+
+        else
+
+            b.Text = tostring(default)
+
+        end
+
+    end)
+
+    return b
+
+end
+
+
+
+local function makeToggle(labelText, initState, yPos, onChanged)
+
+    makeRow(labelText, yPos)
+
+    local btn = Instance.new("TextButton")
+
+    btn.Size             = UDim2.new(0.36, 0, 0, 22)
+
+    btn.Position         = UDim2.new(0.62, 0, 0, yPos)
+
+    btn.BackgroundColor3 = initState and Color3.fromRGB(20,40,28) or C.Surface
+
+    btn.Text             = initState and "ON" or "OFF"
+
+    btn.TextColor3       = initState and C.Green or C.Red
+
+    btn.TextSize         = 11
+
+    btn.Font             = Enum.Font.GothamBold
+
+    btn.Parent           = sScroll
+
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+
+    local st = Instance.new("UIStroke", btn)
+
+    st.Color = initState and C.Green or C.Border
+
+
+
+    local state = initState
+
+    btn.MouseButton1Click:Connect(function()
+
+        state = not state
+
+        TweenService:Create(btn, TweenInfo.new(0.12), {
+
+            BackgroundColor3 = state and Color3.fromRGB(20,40,28) or C.Surface
+
+        }):Play()
+
+        TweenService:Create(st, TweenInfo.new(0.12), {
+
+            Color = state and C.Green or C.Border
+
+        }):Play()
+
+        btn.Text       = state and "ON" or "OFF"
+
+        btn.TextColor3 = state and C.Green or C.Red
+
+        onChanged(state)
+
+    end)
+
+    return btn
+
+end
+
+
+
+-- Settings state
+
+local Settings = {
+
+    SpinDuration  = 2.8,
+
+    SlowDuration  = 1.2,
+
+    UpForce       = 21,
+
+    Spread        = 12,
+
+    PlatformStand = true,
+
+    Ragdoll       = false,
+
+}
+
+
+
+-- ── FLING section ──
+
+secLabel("FLING", C.Pink, 8)
+
+makeRow("Spin Duration",  28) makeBox(Settings.SpinDuration, 28, function(v) Settings.SpinDuration = math.clamp(v,0.5,8) end)
+
+makeRow("Slow Duration",  55) makeBox(Settings.SlowDuration, 55, function(v) Settings.SlowDuration = math.clamp(v,0.1,4) end)
+
+makeRow("Up Force",       82) makeBox(Settings.UpForce,      82, function(v) Settings.UpForce      = math.clamp(v,5,80)  end)
+
+makeRow("H. Spread",     109) makeBox(Settings.Spread,      109, function(v) Settings.Spread       = math.clamp(v,1,50)  end)
+
+
+
+secDiv(136)
+
+
+
+-- ── PHYSICS section ──
+
+secLabel("PHYSICS", C.Purple, 141)
+
+makeToggle("Platform Stand", Settings.PlatformStand, 161,
+
+    function(v) Settings.PlatformStand = v end)
+
+makeToggle("Ragdoll on Fling", Settings.Ragdoll, 188,
+
+    function(v) Settings.Ragdoll = v end)
+
+
+
+secDiv(217)
+
+
+
+-- ── POWER section ──
+
+secLabel("POWER SLIDER", Color3.fromRGB(255,180,50), 222)
+
+makeRow("Min Power",  242) makeBox(1,   242, function(v) _G.SliderMin = math.clamp(v,1,250) end)
+
+makeRow("Max Power",  269) makeBox(250, 269, function(v) _G.SliderMax = math.clamp(v,1,500) end)
+
+
+
+local sfHint = Instance.new("TextLabel")
+
+sfHint.Size              = UDim2.new(1, -16, 0, 24)
+
+sfHint.Position          = UDim2.new(0, 12, 0, 299)
+
+sfHint.BackgroundTransparency = 1
+
+sfHint.Text              = "Slider maps to Min–Max range"
+
+sfHint.TextColor3        = C.TextDim
+
+sfHint.TextSize          = 9
+
+sfHint.Font              = Enum.Font.Gotham
+
+sfHint.TextXAlignment    = Enum.TextXAlignment.Left
+
+sfHint.Parent            = sScroll
+
+
+
+sScroll.CanvasSize = UDim2.new(0, 0, 0, 367)
+
+
+
+_G.SliderMin = 1
+
+_G.SliderMax = 250
+
+
+
+-- Settings drag (title only)
+
+local sfDragStart, sfDragOrigin = nil, nil
+
+sfTitle.InputBegan:Connect(function(i)
+
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+
+        sfDragStart  = i.Position
+
+        sfDragOrigin = SF.Position
+
+    end
+
+end)
+
+UserInputService.InputChanged:Connect(function(i)
+
+    if sfDragStart and i.UserInputType == Enum.UserInputType.MouseMovement then
+
+        local d = i.Position - sfDragStart
+
+        SF.Position = UDim2.new(sfDragOrigin.X.Scale, sfDragOrigin.X.Offset + d.X,
+
+                                sfDragOrigin.Y.Scale, sfDragOrigin.Y.Offset + d.Y)
+
+    end
+
+end)
+
+sfTitle.InputEnded:Connect(function(i)
+
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then sfDragStart = nil end
+
+end)
+
+
+
+gearBtn.MouseButton1Click:Connect(function() SF.Visible = not SF.Visible end)
+
+sfClose.MouseButton1Click:Connect(function() SF.Visible = false end)
+
+
+
+-- =============================================
+
+-- DRAGGABLE MAIN FRAME
+
+-- =============================================
+
 DraggingSlider = false
+
 local Power = 30
 
-SliderFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-        DraggingSlider = true
+local DRAG_THRESHOLD = 4
+
+local frameMouseDown, frameDragging = false, false
+
+local frameDragStart, frameStartPos = nil, nil
+
+
+
+local dragSurfaces = {Frame, header, Title, gearBtn, div, hint}
+
+for _, el in ipairs(dragSurfaces) do
+
+    pcall(function()
+
+        el.InputBegan:Connect(function(input)
+
+            local t = input.UserInputType
+
+            if (t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch)
+
+            and not DraggingSlider then
+
+                frameMouseDown  = true
+
+                frameDragging   = false
+
+                frameDragStart  = input.Position
+
+                frameStartPos   = Frame.Position
+
+            end
+
+        end)
+
+        el.InputEnded:Connect(function(input)
+
+            local t = input.UserInputType
+
+            if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+
+                frameMouseDown = false
+
+                frameDragging  = false
+
+            end
+
+        end)
+
+    end)
+
+end
+
+
+
+UserInputService.InputChanged:Connect(function(input)
+
+    local t = input.UserInputType
+
+    if not frameMouseDown or DraggingSlider then return end
+
+    if t ~= Enum.UserInputType.MouseMovement and t ~= Enum.UserInputType.Touch then return end
+
+    local delta = input.Position - frameDragStart
+
+    if not frameDragging and
+
+    (math.abs(delta.X) > DRAG_THRESHOLD or math.abs(delta.Y) > DRAG_THRESHOLD) then
+
+        frameDragging = true
+
     end
+
+    if frameDragging then
+
+        Frame.Position = UDim2.new(
+
+            frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X,
+
+            frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y
+
+        )
+
+    end
+
+end)
+
+
+
+-- Slider logic
+
+SliderFrame.InputBegan:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        DraggingSlider = true
+
+    end
+
 end)
 
 SliderFrame.InputEnded:Connect(function(input)
+
     if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
+
+    or input.UserInputType == Enum.UserInputType.Touch then
+
         DraggingSlider = false
+
     end
+
 end)
 
 UserInputService.InputChanged:Connect(function(input)
+
     if DraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch) then
+
+    or input.UserInputType == Enum.UserInputType.Touch) then
+
         local mousePos    = input.Position.X
+
         local sliderAbsPos = SliderFrame.AbsolutePosition.X
+
         local sliderWidth  = SliderFrame.AbsoluteSize.X
 
         local relative = math.clamp((mousePos - sliderAbsPos) / sliderWidth, 0, 1)
-        Power = math.floor(relative * 250)
 
-        Fill.Size  = UDim2.new(relative, 0, 1, 0)
-        Label.Text = "fling power: " .. Power
+        local min = _G.SliderMin or 1
+
+        local max = _G.SliderMax or 250
+
+        Power = math.floor(min + relative * (max - min))
+
+        Fill.Size      = UDim2.new(relative, 0, 1, 0)
+
+        Label.Text     = "Power: " .. Power
+
+        powerBadge.Text = tostring(Power)
+
     end
+
 end)
 
+
+
 -- ╔════════════════════════════════════════════╗
--- ║          ONE-TIME FLING BURST + LONG SPIN  ║
+
+-- ║       FE-VISIBLE RAGDOLL HELPERS           ║
+
+-- ║  Motor6D.Enabled is replicated from client ║
+
+-- ║  so other players see the effect.          ║
+
 -- ╚════════════════════════════════════════════╝
 
--- FIX 5: Cooldown so spamming doesn't stack impulses
+
+
+local function applyRagdoll(char)
+
+    for _, v in ipairs(char:GetDescendants()) do
+
+        if v:IsA("Motor6D") then
+
+            v.Enabled = false
+
+        end
+
+    end
+
+end
+
+
+
+local function removeRagdoll(char)
+
+    for _, v in ipairs(char:GetDescendants()) do
+
+        if v:IsA("Motor6D") then
+
+            v.Enabled = true
+
+        end
+
+    end
+
+end
+
+
+
+-- ── Keybind ──
+
+hint.Text = "[R] fling  •  [⚙] settings  •  drag to move"
+
+UserInputService.InputBegan:Connect(function(input, gp)
+
+    if gp then return end
+
+    if input.KeyCode == Enum.KeyCode.R then
+
+        doFlingBurst()
+
+    end
+
+end)
+
+
+
 local onCooldown = false
 
+
+
 local function doFlingBurst()
+
     if onCooldown then return end
+
     if not character or not rootPart or not rootPart.Parent then return end
+
+
 
     onCooldown = true
 
+    setCooldownUI(true)
+
+
+
     local intensity = math.max(Power, 1) / 375
 
-    -- FIX 4: Disable humanoid state for proper ragdoll on both R6 and R15
-    humanoid.PlatformStand = true
+
+
+    if Settings.PlatformStand then
+
+        humanoid.PlatformStand = true
+
+    end
+
     humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
-    -- FIX 1: Use AssemblyLinearVelocity instead of deprecated .Velocity
+
+
+    -- FE-visible ragdoll: disabling Motor6D replicates to all clients
+
+    if Settings.Ragdoll then
+
+        applyRagdoll(character)
+
+    end
+
+
+
     rootPart.AssemblyLinearVelocity = Vector3.new(
-        math.random(-12, 12) * intensity,
-        math.random(15,  28) * intensity,
-        math.random(-12, 12) * intensity
+
+        math.random(-Settings.Spread, Settings.Spread) * intensity,
+
+        math.random(Settings.UpForce - 6, Settings.UpForce + 6) * intensity,
+
+        math.random(-Settings.Spread, Settings.Spread) * intensity
+
     ) * 55
 
-    -- FIX 1: Use AssemblyAngularVelocity for spin (single assignment, no conflict)
+
+
     rootPart.AssemblyAngularVelocity = Vector3.new(
+
         math.random(-1000, 1000) * intensity,
+
         math.random(-1500, 1500) * intensity,
+
         math.random(-1000, 1000) * intensity
+
     )
 
-    -- FIX 2: Lerp angular velocity manually since TweenService can't tween it
-    local spinDuration  = 2.8 + math.random() * 0.7
-    local slowDuration  = 1.2
+
+
+    local spinDuration  = Settings.SpinDuration + math.random() * 0.7
+
+    local slowDuration  = Settings.SlowDuration
+
     local spinStart     = tick()
+
     local initialAngVel = rootPart.AssemblyAngularVelocity
 
+
+
     local conn
+
     conn = RunService.Heartbeat:Connect(function()
+
         if not rootPart or not rootPart.Parent then
+
             conn:Disconnect()
+
             return
+
         end
+
+
 
         local elapsed = tick() - spinStart
 
+
+
         if elapsed < spinDuration then
-            -- Leave spin untouched during the air phase
+
+            -- air phase
+
+
 
         elseif elapsed < spinDuration + slowDuration then
-            -- Lerp angular velocity to zero over slowDuration
+
             local t = (elapsed - spinDuration) / slowDuration
-            t = t * t * (3 - 2 * t) -- smoothstep
+
+            t = t * t * (3 - 2 * t)
+
             rootPart.AssemblyAngularVelocity = initialAngVel:Lerp(Vector3.zero, t)
 
+
+
         else
-            -- Done: zero out and restore humanoid
+
             rootPart.AssemblyAngularVelocity = Vector3.zero
+
             conn:Disconnect()
 
+
+
             if humanoid and humanoid.Parent then
+
                 humanoid.PlatformStand = false
+
+                if Settings.Ragdoll then
+
+                    removeRagdoll(character)
+
+                end
+
                 humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+
             end
 
-            -- FIX 5: Release cooldown after full recovery
+
+
             task.delay(0.5, function()
+
                 onCooldown = false
+
+                setCooldownUI(false)
+
             end)
+
         end
+
     end)
+
 end
 
--- Button
-local ActionButton = Instance.new("TextButton")
-ActionButton.Size = UDim2.new(0.8, 0, 0, 50)
-ActionButton.Position = UDim2.new(0.1, 0, 0.65, 0)
-ActionButton.BackgroundColor3 = Color3.fromRGB(220, 60, 90)
-ActionButton.Text = "fling yourself!"
-ActionButton.TextColor3 = Color3.new(1,1,1)
-ActionButton.Font = Enum.Font.FredokaOne
-ActionButton.TextSize = 28
-ActionButton.Parent = Frame
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 12)
-btnCorner.Parent = ActionButton
 
 ActionButton.MouseButton1Click:Connect(doFlingBurst)
 
--- Reset handling
+
+
 player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoid  = newChar:WaitForChild("Humanoid")
-    rootPart  = newChar:WaitForChild("HumanoidRootPart")
+
+    character  = newChar
+
+    humanoid   = newChar:WaitForChild("Humanoid")
+
+    rootPart   = newChar:WaitForChild("HumanoidRootPart")
+
     onCooldown = false
+
+    setCooldownUI(false)
+
 end)
