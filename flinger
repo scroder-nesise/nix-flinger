@@ -1,9 +1,9 @@
 -- =============================================
---  NIX'S YOURSELF FLINGER  — BallSocket Edition
+--  NIX'S YOURSELF FLINGER
 --  Ragdoll uses BallSocketConstraints.
 --  FE-visible: attachments + constraints created
 --  on client replicate to server automatically.
---  Includes: Sit on Fling, all settings, keybind.
+--  Includes: Sit on Fling, still on wip. 
 -- =============================================
 
 local Players          = game:GetService("Players")
