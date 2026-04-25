@@ -1,1269 +1,710 @@
-local Players = game:GetService("Players")
+-- =============================================
+--  NIX'S YOURSELF FLINGER  — BallSocket Edition
+--  Ragdoll uses BallSocketConstraints.
+--  FE-visible: attachments + constraints created
+--  on client replicate to server automatically.
+--  Includes: Sit on Fling, all settings, keybind.
+-- =============================================
 
+local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService       = game:GetService("RunService")
+local TweenService     = game:GetService("TweenService")
 
-local RunService = game:GetService("RunService")
-
-local TweenService = game:GetService("TweenService")
-
-
-
-local player = Players.LocalPlayer
-
+local player    = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
+local humanoid  = character:WaitForChild("Humanoid")
+local rootPart  = character:WaitForChild("HumanoidRootPart")
 
-local humanoid = character:WaitForChild("Humanoid")
-
-local rootPart = character:WaitForChild("HumanoidRootPart")
-
-
-
--- ╔════════════════════════════════════════════╗
-
--- ║       NIX'S YOURSELF FLINGER  V2          ║
-
--- ╚════════════════════════════════════════════╝
-
-
-
+-- =============================================
+--  COLOURS
+-- =============================================
 local C = {
-
     BG      = Color3.fromRGB(12, 11, 18),
-
-    Panel   = Color3.fromRGB(20, 18, 30),
-
     Surface = Color3.fromRGB(28, 25, 42),
-
     Input   = Color3.fromRGB(22, 20, 34),
-
     Border  = Color3.fromRGB(55, 48, 80),
-
     Pink    = Color3.fromRGB(255, 75, 120),
-
     Purple  = Color3.fromRGB(160, 90, 255),
-
     Green   = Color3.fromRGB(55, 220, 130),
-
     Red     = Color3.fromRGB(240, 65, 75),
-
     TextOn  = Color3.fromRGB(220, 215, 235),
-
     TextSub = Color3.fromRGB(120, 110, 148),
-
     TextDim = Color3.fromRGB(58,  52,  80),
-
 }
 
+-- =============================================
+--  BALLSOCKET RAGDOLL
+--  Per-limb angle limits so it looks realistic.
+--  Tag prefix lets cleanup find every constraint.
+-- =============================================
+local BSC_TAG = "__NixRagBSC"
 
+local LIMITS = {
+    Head          = { upper = 45,  twistL = -60, twistU = 60  },
+    UpperTorso    = { upper = 45,  twistL = -30, twistU = 30  },
+    LowerTorso    = { upper = 30,  twistL = -20, twistU = 20  },
+    LeftUpperArm  = { upper = 90,  twistL = -90, twistU = 90  },
+    RightUpperArm = { upper = 90,  twistL = -90, twistU = 90  },
+    LeftLowerArm  = { upper = 80,  twistL = -10, twistU = 10  },
+    RightLowerArm = { upper = 80,  twistL = -10, twistU = 10  },
+    LeftHand      = { upper = 30,  twistL = -15, twistU = 15  },
+    RightHand     = { upper = 30,  twistL = -15, twistU = 15  },
+    LeftUpperLeg  = { upper = 80,  twistL = -45, twistU = 45  },
+    RightUpperLeg = { upper = 80,  twistL = -45, twistU = 45  },
+    LeftLowerLeg  = { upper = 90,  twistL = -10, twistU = 10  },
+    RightLowerLeg = { upper = 90,  twistL = -10, twistU = 10  },
+    LeftFoot      = { upper = 25,  twistL = -10, twistU = 10  },
+    RightFoot     = { upper = 25,  twistL = -10, twistU = 10  },
+}
 
-local ScreenGui = Instance.new("ScreenGui")
+local function applyRagdoll(char)
+    if not char then return end
+    for _, motor in ipairs(char:GetDescendants()) do
+        if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then
+            local p0   = motor.Part0
+            local p1   = motor.Part1
+            local name = p1.Name
+            local lim  = LIMITS[name]
 
-ScreenGui.Name          = "NixFlingerV2"
+            motor.Enabled = false   -- disable joint so physics takes over
 
-ScreenGui.ResetOnSpawn  = false
+            -- Attachments at joint origin
+            local a0 = Instance.new("Attachment")
+            a0.Name   = BSC_TAG .. "_a0_" .. name
+            a0.CFrame = motor.C0
+            a0.Parent = p0
 
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            local a1 = Instance.new("Attachment")
+            a1.Name   = BSC_TAG .. "_a1_" .. name
+            a1.CFrame = motor.C1
+            a1.Parent = p1
 
-ScreenGui.Parent        = player:WaitForChild("PlayerGui")
+            -- BallSocketConstraint
+            local bsc       = Instance.new("BallSocketConstraint")
+            bsc.Name        = BSC_TAG .. "_bsc_" .. name
+            bsc.Attachment0 = a0
+            bsc.Attachment1 = a1
 
+            if lim then
+                bsc.LimitsEnabled      = true
+                bsc.UpperAngle         = lim.upper
+                bsc.TwistLimitsEnabled = true
+                bsc.TwistLowerAngle    = lim.twistL
+                bsc.TwistUpperAngle    = lim.twistU
+            else
+                bsc.LimitsEnabled = false
+            end
 
+            bsc.Parent = p0
+        end
+    end
+end
 
--- Main frame  240 × 148
+local function removeRagdoll(char)
+    if not char then return end
+    -- Destroy all BSC attachments and constraints
+    for _, v in ipairs(char:GetDescendants()) do
+        if v.Name:sub(1, #BSC_TAG) == BSC_TAG then
+            v:Destroy()
+        end
+    end
+    -- Re-enable all joints
+    for _, motor in ipairs(char:GetDescendants()) do
+        if motor:IsA("Motor6D") then
+            motor.Enabled = true
+        end
+    end
+end
 
+-- =============================================
+--  SETTINGS
+-- =============================================
+local Settings = {
+    SpinDuration   = 2.8,
+    SlowDuration   = 1.2,
+    UpForce        = 21,
+    Spread         = 12,
+    PlatformStand  = true,
+    Ragdoll        = false,
+    SitOnFling     = false,
+    _sittingActive = false,
+}
+
+_G.SliderMin = 1
+_G.SliderMax = 250
+
+-- =============================================
+--  GUI
+-- =============================================
 local W, H = 240, 148
 
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "NixFlingerBSC"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent         = player:WaitForChild("PlayerGui")
+
 local Frame = Instance.new("Frame")
-
 Frame.Name             = "Main"
-
 Frame.Size             = UDim2.new(0, W, 0, H)
-
 Frame.Position         = UDim2.new(0.5, -W/2, 0.5, -H/2)
-
 Frame.BackgroundColor3 = C.BG
-
 Frame.BackgroundTransparency = 0.06
-
 Frame.BorderSizePixel  = 0
-
 Frame.ClipsDescendants = true
-
 Frame.Parent           = ScreenGui
-
 Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 14)
 
-
-
 local fStroke = Instance.new("UIStroke", Frame)
-
 fStroke.Thickness       = 1.3
-
 fStroke.Color           = C.Border
-
 fStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-
-
--- Pink–purple gradient top bar
-
+-- Top gradient bar
 local topBar = Instance.new("Frame")
-
 topBar.Size             = UDim2.new(1, 0, 0, 3)
-
 topBar.BackgroundColor3 = C.Pink
-
 topBar.BorderSizePixel  = 0
-
 topBar.ZIndex           = 4
-
 topBar.Parent           = Frame
-
 Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 14)
-
-
-
 local topGrad = Instance.new("UIGradient", topBar)
-
 topGrad.Color = ColorSequence.new({
-
     ColorSequenceKeypoint.new(0, C.Pink),
-
     ColorSequenceKeypoint.new(1, C.Purple),
-
 })
 
-
-
--- ── Header row ──
-
+-- Header
 local header = Instance.new("Frame")
-
-header.Size             = UDim2.new(1, 0, 0, 36)
-
+header.Size                 = UDim2.new(1, 0, 0, 36)
 header.BackgroundTransparency = 1
-
-header.Parent           = Frame
-
-
-
--- Gear button (top-left — opens settings)
+header.Parent               = Frame
 
 local gearBtn = Instance.new("TextButton")
-
 gearBtn.Size             = UDim2.new(0, 28, 0, 28)
-
 gearBtn.Position         = UDim2.new(0, 7, 0.5, -14)
-
 gearBtn.BackgroundColor3 = C.Surface
-
 gearBtn.Text             = "⚙"
-
 gearBtn.TextColor3       = C.TextSub
-
 gearBtn.TextSize         = 14
-
 gearBtn.Font             = Enum.Font.GothamBold
-
 gearBtn.BorderSizePixel  = 0
-
 gearBtn.ZIndex           = 3
-
 gearBtn.Parent           = header
-
 Instance.new("UICorner", gearBtn).CornerRadius = UDim.new(0, 7)
 
-
-
--- Title
-
 local Title = Instance.new("TextLabel")
-
 Title.Size              = UDim2.new(1, -80, 1, 0)
-
 Title.Position          = UDim2.new(0, 42, 0, 0)
-
 Title.BackgroundTransparency = 1
-
 Title.Text              = "nix's flinger"
-
 Title.TextColor3        = C.TextOn
-
 Title.TextSize          = 14
-
 Title.Font              = Enum.Font.GothamBold
-
 Title.TextXAlignment    = Enum.TextXAlignment.Left
-
 Title.ZIndex            = 3
-
 Title.Parent            = header
 
-
-
--- Cooldown indicator dot (top-right)
-
 local cdDot = Instance.new("Frame")
-
 cdDot.Size             = UDim2.new(0, 7, 0, 7)
-
 cdDot.Position         = UDim2.new(1, -16, 0.5, -3.5)
-
 cdDot.BackgroundColor3 = C.Green
-
 cdDot.BorderSizePixel  = 0
-
 cdDot.ZIndex           = 3
-
 cdDot.Parent           = header
-
 Instance.new("UICorner", cdDot).CornerRadius = UDim.new(1, 0)
 
-
-
 local cdLabel = Instance.new("TextLabel")
-
 cdLabel.Size              = UDim2.new(0, 36, 0, 14)
-
 cdLabel.Position          = UDim2.new(1, -52, 0.5, -7)
-
 cdLabel.BackgroundTransparency = 1
-
 cdLabel.Text              = "READY"
-
 cdLabel.TextColor3        = C.Green
-
 cdLabel.TextSize          = 9
-
 cdLabel.Font              = Enum.Font.GothamBold
-
 cdLabel.ZIndex            = 3
-
 cdLabel.Parent            = header
 
-
-
--- ── Divider ──
-
+-- Divider
 local div = Instance.new("Frame")
-
 div.Size             = UDim2.new(1, -16, 0, 1)
-
 div.Position         = UDim2.new(0, 8, 0, 36)
-
 div.BackgroundColor3 = C.Border
-
 div.BackgroundTransparency = 0.45
-
 div.BorderSizePixel  = 0
-
 div.Parent           = Frame
 
-
-
--- ── Slider ──
-
+-- Slider
 local SliderFrame = Instance.new("Frame")
-
 SliderFrame.Size             = UDim2.new(1, -20, 0, 28)
-
 SliderFrame.Position         = UDim2.new(0, 10, 0, 44)
-
 SliderFrame.BackgroundColor3 = C.Surface
-
 SliderFrame.BorderSizePixel  = 0
-
 SliderFrame.Parent           = Frame
-
 Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0, 8)
 
-
-
 local Fill = Instance.new("Frame")
-
 Fill.Size             = UDim2.new(0.12, 0, 1, 0)
-
 Fill.BackgroundColor3 = C.Pink
-
 Fill.BorderSizePixel  = 0
-
 Fill.Parent           = SliderFrame
-
 Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 8)
-
-
-
 local fillGrad = Instance.new("UIGradient", Fill)
-
 fillGrad.Color = ColorSequence.new({
-
     ColorSequenceKeypoint.new(0, C.Pink),
-
     ColorSequenceKeypoint.new(1, C.Purple),
-
 })
-
-
 
 local Label = Instance.new("TextLabel")
-
 Label.Size              = UDim2.new(1, 0, 1, 0)
-
 Label.BackgroundTransparency = 1
-
 Label.Text              = "Power: 30"
-
 Label.TextColor3        = C.TextOn
-
 Label.TextSize          = 12
-
 Label.Font              = Enum.Font.GothamBold
-
 Label.ZIndex            = 2
-
 Label.Parent            = SliderFrame
 
-
-
--- Power value badge (right edge of slider)
-
 local powerBadge = Instance.new("TextLabel")
-
 powerBadge.Size              = UDim2.new(0, 34, 0, 18)
-
 powerBadge.Position          = UDim2.new(1, -38, 0.5, -9)
-
 powerBadge.BackgroundColor3  = C.Input
-
 powerBadge.Text              = "30"
-
 powerBadge.TextColor3        = C.Pink
-
 powerBadge.TextSize          = 10
-
 powerBadge.Font              = Enum.Font.GothamBold
-
 powerBadge.ZIndex            = 3
-
 powerBadge.Parent            = SliderFrame
-
 Instance.new("UICorner", powerBadge).CornerRadius = UDim.new(0, 5)
 
-
-
--- ── Fling button ──
-
+-- Fling button
 local ActionButton = Instance.new("TextButton")
-
 ActionButton.Size             = UDim2.new(1, -20, 0, 42)
-
 ActionButton.Position         = UDim2.new(0, 10, 0, 82)
-
 ActionButton.BackgroundColor3 = C.Pink
-
 ActionButton.Text             = "✦  fling yourself!"
-
 ActionButton.TextColor3       = Color3.new(1, 1, 1)
-
 ActionButton.TextSize         = 15
-
 ActionButton.Font             = Enum.Font.GothamBold
-
 ActionButton.BorderSizePixel  = 0
-
 ActionButton.Parent           = Frame
-
 Instance.new("UICorner", ActionButton).CornerRadius = UDim.new(0, 10)
-
-
-
 local btnGrad = Instance.new("UIGradient", ActionButton)
-
 btnGrad.Color = ColorSequence.new({
-
     ColorSequenceKeypoint.new(0, C.Pink),
-
     ColorSequenceKeypoint.new(1, C.Purple),
-
 })
 
-
-
--- Hint label
-
 local hint = Instance.new("TextLabel")
-
 hint.Size              = UDim2.new(1, 0, 0, 14)
-
 hint.Position          = UDim2.new(0, 0, 1, -16)
-
 hint.BackgroundTransparency = 1
-
-hint.Text              = "drag to move"
-
+hint.Text              = "[R] fling  •  [⚙] settings  •  drag to move"
 hint.TextColor3        = C.TextDim
-
 hint.TextSize          = 9
-
 hint.Font              = Enum.Font.Gotham
-
 hint.Parent            = Frame
 
-
-
--- ── Cooldown UI helper ──
-
+-- Cooldown UI
 local function setCooldownUI(active)
-
-    TweenService:Create(cdDot,   TweenInfo.new(0.15), {
-
+    TweenService:Create(cdDot, TweenInfo.new(0.15), {
         BackgroundColor3 = active and C.Red or C.Green
-
     }):Play()
-
     TweenService:Create(ActionButton, TweenInfo.new(0.15), {
-
         BackgroundColor3 = active and C.Surface or C.Pink
-
     }):Play()
-
     cdLabel.Text       = active and "WAIT"  or "READY"
-
     cdLabel.TextColor3 = active and C.Red   or C.Green
-
     ActionButton.Text  = active and "⏳  cooling down…" or "✦  fling yourself!"
-
 end
 
-
-
 -- =============================================
-
--- SETTINGS PANEL  (200 × 290, scrollable)
-
+--  SETTINGS PANEL  (scrollable)
 -- =============================================
-
 local SF = Instance.new("Frame")
-
-SF.Name             = "Settings"
-
 SF.Size             = UDim2.new(0, 200, 0, 290)
-
 SF.Position         = UDim2.new(0.5, -100, 0.5, -145)
-
 SF.BackgroundColor3 = C.BG
-
 SF.BackgroundTransparency = 0.06
-
 SF.BorderSizePixel  = 0
-
 SF.Visible          = false
-
 SF.ZIndex           = 10
-
 SF.Parent           = ScreenGui
-
 Instance.new("UICorner", SF).CornerRadius = UDim.new(0, 13)
-
 local sfStroke = Instance.new("UIStroke", SF)
-
 sfStroke.Color     = C.Border
-
 sfStroke.Thickness = 1.3
 
-
-
 local sfTitle = Instance.new("TextLabel")
-
 sfTitle.Size              = UDim2.new(1, 0, 0, 30)
-
 sfTitle.BackgroundTransparency = 1
-
 sfTitle.Text              = "Settings"
-
 sfTitle.TextColor3        = C.TextOn
-
 sfTitle.TextSize          = 13
-
 sfTitle.Font              = Enum.Font.GothamBold
-
 sfTitle.ZIndex            = 12
-
 sfTitle.Parent            = SF
 
-
-
 local sfClose = Instance.new("TextButton")
-
 sfClose.Size             = UDim2.new(0, 24, 0, 24)
-
 sfClose.Position         = UDim2.new(1, -28, 0, 3)
-
 sfClose.BackgroundTransparency = 1
-
 sfClose.Text             = "✕"
-
 sfClose.TextColor3       = C.Red
-
 sfClose.TextSize         = 15
-
 sfClose.Font             = Enum.Font.GothamBold
-
 sfClose.ZIndex           = 12
-
 sfClose.Parent           = SF
 
-
-
 local sfDiv = Instance.new("Frame")
-
 sfDiv.Size             = UDim2.new(1, -16, 0, 1)
-
 sfDiv.Position         = UDim2.new(0, 8, 0, 29)
-
 sfDiv.BackgroundColor3 = C.Border
-
 sfDiv.BackgroundTransparency = 0.4
-
 sfDiv.BorderSizePixel  = 0
-
 sfDiv.ZIndex           = 11
-
 sfDiv.Parent           = SF
 
-
-
--- Scroll area
-
 local sScroll = Instance.new("ScrollingFrame")
-
 sScroll.Size                 = UDim2.new(1, 0, 1, -30)
-
 sScroll.Position             = UDim2.new(0, 0, 0, 30)
-
 sScroll.BackgroundTransparency = 1
-
 sScroll.BorderSizePixel      = 0
-
 sScroll.ScrollBarThickness   = 3
-
 sScroll.ScrollBarImageColor3 = C.Border
-
-sScroll.CanvasSize           = UDim2.new(0, 0, 0, 340)
-
+sScroll.CanvasSize           = UDim2.new(0, 0, 0, 412)
 sScroll.ScrollingDirection   = Enum.ScrollingDirection.Y
-
 sScroll.ZIndex               = 10
-
 sScroll.Parent               = SF
 
-
-
--- Settings helpers
-
 local function secLabel(text, color, y)
-
     local l = Instance.new("TextLabel")
-
     l.Size              = UDim2.new(1, -16, 0, 15)
-
     l.Position          = UDim2.new(0, 12, 0, y)
-
     l.BackgroundTransparency = 1
-
     l.Text              = text
-
     l.TextColor3        = color
-
     l.TextSize          = 10
-
     l.Font              = Enum.Font.GothamBold
-
     l.TextXAlignment    = Enum.TextXAlignment.Left
-
     l.Parent            = sScroll
-
 end
-
-
 
 local function secDiv(y)
-
     local d = Instance.new("Frame")
-
     d.Size             = UDim2.new(1, -16, 0, 1)
-
     d.Position         = UDim2.new(0, 8, 0, y)
-
     d.BackgroundColor3 = C.Border
-
     d.BackgroundTransparency = 0.45
-
     d.BorderSizePixel  = 0
-
     d.Parent           = sScroll
-
 end
 
-
-
-local function makeRow(labelText, yPos)
-
+local function makeRow(text, y)
     local l = Instance.new("TextLabel")
-
     l.Size              = UDim2.new(0.58, 0, 0, 22)
-
-    l.Position          = UDim2.new(0, 12, 0, yPos)
-
+    l.Position          = UDim2.new(0, 12, 0, y)
     l.BackgroundTransparency = 1
-
-    l.Text              = labelText
-
+    l.Text              = text
     l.TextColor3        = C.TextSub
-
     l.TextSize          = 11
-
     l.Font              = Enum.Font.Gotham
-
     l.TextXAlignment    = Enum.TextXAlignment.Left
-
     l.Parent            = sScroll
-
-    return l
-
 end
 
-
-
-local function makeBox(default, yPos, onChanged)
-
+local function makeBox(default, y, onChange)
     local b = Instance.new("TextBox")
-
     b.Size             = UDim2.new(0.36, 0, 0, 22)
-
-    b.Position         = UDim2.new(0.62, 0, 0, yPos)
-
+    b.Position         = UDim2.new(0.62, 0, 0, y)
     b.BackgroundColor3 = C.Input
-
     b.Text             = tostring(default)
-
     b.TextColor3       = C.TextOn
-
     b.TextSize         = 11
-
     b.Font             = Enum.Font.Gotham
-
     b.Parent           = sScroll
-
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
-
     b.FocusLost:Connect(function()
-
         local v = tonumber(b.Text)
-
-        if v then
-
-            onChanged(v)
-
-        else
-
-            b.Text = tostring(default)
-
-        end
-
+        if v then onChange(v) else b.Text = tostring(default) end
     end)
-
-    return b
-
 end
 
-
-
-local function makeToggle(labelText, initState, yPos, onChanged)
-
-    makeRow(labelText, yPos)
-
+local function makeToggle(text, init, y, onChange)
+    makeRow(text, y)
     local btn = Instance.new("TextButton")
-
     btn.Size             = UDim2.new(0.36, 0, 0, 22)
-
-    btn.Position         = UDim2.new(0.62, 0, 0, yPos)
-
-    btn.BackgroundColor3 = initState and Color3.fromRGB(20,40,28) or C.Surface
-
-    btn.Text             = initState and "ON" or "OFF"
-
-    btn.TextColor3       = initState and C.Green or C.Red
-
+    btn.Position         = UDim2.new(0.62, 0, 0, y)
+    btn.BackgroundColor3 = init and Color3.fromRGB(20,40,28) or C.Surface
+    btn.Text             = init and "ON" or "OFF"
+    btn.TextColor3       = init and C.Green or C.Red
     btn.TextSize         = 11
-
     btn.Font             = Enum.Font.GothamBold
-
     btn.Parent           = sScroll
-
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-
     local st = Instance.new("UIStroke", btn)
-
-    st.Color = initState and C.Green or C.Border
-
-
-
-    local state = initState
-
+    st.Color = init and C.Green or C.Border
+    local state = init
     btn.MouseButton1Click:Connect(function()
-
         state = not state
-
         TweenService:Create(btn, TweenInfo.new(0.12), {
-
             BackgroundColor3 = state and Color3.fromRGB(20,40,28) or C.Surface
-
         }):Play()
-
         TweenService:Create(st, TweenInfo.new(0.12), {
-
             Color = state and C.Green or C.Border
-
         }):Play()
-
         btn.Text       = state and "ON" or "OFF"
-
         btn.TextColor3 = state and C.Green or C.Red
-
-        onChanged(state)
-
+        onChange(state)
     end)
-
-    return btn
-
 end
 
-
-
--- Settings state
-
-local Settings = {
-
-    SpinDuration  = 2.8,
-
-    SlowDuration  = 1.2,
-
-    UpForce       = 21,
-
-    Spread        = 12,
-
-    PlatformStand = true,
-
-    Ragdoll       = false,
-
-}
-
-
-
--- ── FLING section ──
-
+-- ── FLING ──
 secLabel("FLING", C.Pink, 8)
-
-makeRow("Spin Duration",  28) makeBox(Settings.SpinDuration, 28, function(v) Settings.SpinDuration = math.clamp(v,0.5,8) end)
-
-makeRow("Slow Duration",  55) makeBox(Settings.SlowDuration, 55, function(v) Settings.SlowDuration = math.clamp(v,0.1,4) end)
-
-makeRow("Up Force",       82) makeBox(Settings.UpForce,      82, function(v) Settings.UpForce      = math.clamp(v,5,80)  end)
-
-makeRow("H. Spread",     109) makeBox(Settings.Spread,      109, function(v) Settings.Spread       = math.clamp(v,1,50)  end)
-
-
+makeRow("Spin Duration", 28) makeBox(Settings.SpinDuration, 28, function(v) Settings.SpinDuration = math.clamp(v,0.5,8) end)
+makeRow("Slow Duration", 55) makeBox(Settings.SlowDuration, 55, function(v) Settings.SlowDuration = math.clamp(v,0.1,4) end)
+makeRow("Up Force",      82) makeBox(Settings.UpForce,      82, function(v) Settings.UpForce      = math.clamp(v,5,80)  end)
+makeRow("H. Spread",    109) makeBox(Settings.Spread,      109, function(v) Settings.Spread       = math.clamp(v,1,50)  end)
 
 secDiv(136)
 
-
-
--- ── PHYSICS section ──
-
+-- ── PHYSICS ──
 secLabel("PHYSICS", C.Purple, 141)
+makeToggle("Platform Stand",   Settings.PlatformStand, 161, function(v) Settings.PlatformStand = v end)
+makeToggle("Ragdoll on Fling", Settings.Ragdoll,       188, function(v) Settings.Ragdoll = v        end)
+makeToggle("Sit on Fling",     Settings.SitOnFling,    215, function(v) Settings.SitOnFling = v     end)
 
-makeToggle("Platform Stand", Settings.PlatformStand, 161,
+local sitHint = Instance.new("TextLabel")
+sitHint.Size              = UDim2.new(1, -16, 0, 14)
+sitHint.Position          = UDim2.new(0, 12, 0, 239)
+sitHint.BackgroundTransparency = 1
+sitHint.Text              = "Jump to stand back up"
+sitHint.TextColor3        = C.TextDim
+sitHint.TextSize          = 9
+sitHint.Font              = Enum.Font.Gotham
+sitHint.TextXAlignment    = Enum.TextXAlignment.Left
+sitHint.Parent            = sScroll
 
-    function(v) Settings.PlatformStand = v end)
+secDiv(258)
 
-makeToggle("Ragdoll on Fling", Settings.Ragdoll, 188,
-
-    function(v) Settings.Ragdoll = v end)
-
-
-
-secDiv(217)
-
-
-
--- ── POWER section ──
-
-secLabel("POWER SLIDER", Color3.fromRGB(255,180,50), 222)
-
-makeRow("Min Power",  242) makeBox(1,   242, function(v) _G.SliderMin = math.clamp(v,1,250) end)
-
-makeRow("Max Power",  269) makeBox(250, 269, function(v) _G.SliderMax = math.clamp(v,1,500) end)
-
-
+-- ── POWER SLIDER ──
+secLabel("POWER SLIDER", Color3.fromRGB(255,180,50), 263)
+makeRow("Min Power", 283) makeBox(1,   283, function(v) _G.SliderMin = math.clamp(v,1,250) end)
+makeRow("Max Power", 310) makeBox(250, 310, function(v) _G.SliderMax = math.clamp(v,1,500) end)
 
 local sfHint = Instance.new("TextLabel")
-
-sfHint.Size              = UDim2.new(1, -16, 0, 24)
-
-sfHint.Position          = UDim2.new(0, 12, 0, 299)
-
+sfHint.Size              = UDim2.new(1, -16, 0, 14)
+sfHint.Position          = UDim2.new(0, 12, 0, 338)
 sfHint.BackgroundTransparency = 1
-
 sfHint.Text              = "Slider maps to Min–Max range"
-
 sfHint.TextColor3        = C.TextDim
-
 sfHint.TextSize          = 9
-
 sfHint.Font              = Enum.Font.Gotham
-
 sfHint.TextXAlignment    = Enum.TextXAlignment.Left
-
 sfHint.Parent            = sScroll
 
-
-
-sScroll.CanvasSize = UDim2.new(0, 0, 0, 367)
-
-
-
-_G.SliderMin = 1
-
-_G.SliderMax = 250
-
-
-
--- Settings drag (title only)
-
-local sfDragStart, sfDragOrigin = nil, nil
-
+-- Settings drag
+local sfDS, sfDO = nil, nil
 sfTitle.InputBegan:Connect(function(i)
-
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-
-        sfDragStart  = i.Position
-
-        sfDragOrigin = SF.Position
-
-    end
-
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then sfDS = i.Position; sfDO = SF.Position end
 end)
-
 UserInputService.InputChanged:Connect(function(i)
-
-    if sfDragStart and i.UserInputType == Enum.UserInputType.MouseMovement then
-
-        local d = i.Position - sfDragStart
-
-        SF.Position = UDim2.new(sfDragOrigin.X.Scale, sfDragOrigin.X.Offset + d.X,
-
-                                sfDragOrigin.Y.Scale, sfDragOrigin.Y.Offset + d.Y)
-
+    if sfDS and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local d = i.Position - sfDS
+        SF.Position = UDim2.new(sfDO.X.Scale, sfDO.X.Offset+d.X, sfDO.Y.Scale, sfDO.Y.Offset+d.Y)
     end
-
 end)
-
 sfTitle.InputEnded:Connect(function(i)
-
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then sfDragStart = nil end
-
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then sfDS = nil end
 end)
-
-
 
 gearBtn.MouseButton1Click:Connect(function() SF.Visible = not SF.Visible end)
-
 sfClose.MouseButton1Click:Connect(function() SF.Visible = false end)
 
-
-
 -- =============================================
-
--- DRAGGABLE MAIN FRAME
-
+--  MAIN FRAME DRAG
 -- =============================================
-
 DraggingSlider = false
-
 local Power = 30
-
 local DRAG_THRESHOLD = 4
+local fDown, fDrag, fDS, fSP = false, false, nil, nil
 
-local frameMouseDown, frameDragging = false, false
-
-local frameDragStart, frameStartPos = nil, nil
-
-
-
-local dragSurfaces = {Frame, header, Title, gearBtn, div, hint}
-
-for _, el in ipairs(dragSurfaces) do
-
+for _, el in ipairs({Frame, header, Title, gearBtn, div, hint}) do
     pcall(function()
-
         el.InputBegan:Connect(function(input)
-
             local t = input.UserInputType
-
-            if (t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch)
-
-            and not DraggingSlider then
-
-                frameMouseDown  = true
-
-                frameDragging   = false
-
-                frameDragStart  = input.Position
-
-                frameStartPos   = Frame.Position
-
+            if (t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch) and not DraggingSlider then
+                fDown = true; fDrag = false; fDS = input.Position; fSP = Frame.Position
             end
-
         end)
-
         el.InputEnded:Connect(function(input)
-
             local t = input.UserInputType
-
             if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
-
-                frameMouseDown = false
-
-                frameDragging  = false
-
+                fDown = false; fDrag = false
             end
-
         end)
-
     end)
-
 end
 
-
-
 UserInputService.InputChanged:Connect(function(input)
-
     local t = input.UserInputType
-
-    if not frameMouseDown or DraggingSlider then return end
-
+    if not fDown or DraggingSlider then return end
     if t ~= Enum.UserInputType.MouseMovement and t ~= Enum.UserInputType.Touch then return end
-
-    local delta = input.Position - frameDragStart
-
-    if not frameDragging and
-
-    (math.abs(delta.X) > DRAG_THRESHOLD or math.abs(delta.Y) > DRAG_THRESHOLD) then
-
-        frameDragging = true
-
+    local delta = input.Position - fDS
+    if not fDrag and (math.abs(delta.X) > DRAG_THRESHOLD or math.abs(delta.Y) > DRAG_THRESHOLD) then fDrag = true end
+    if fDrag then
+        Frame.Position = UDim2.new(fSP.X.Scale, fSP.X.Offset+delta.X, fSP.Y.Scale, fSP.Y.Offset+delta.Y)
     end
-
-    if frameDragging then
-
-        Frame.Position = UDim2.new(
-
-            frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X,
-
-            frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y
-
-        )
-
-    end
-
 end)
 
-
-
--- Slider logic
-
-SliderFrame.InputBegan:Connect(function(input)
-
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-
-    or input.UserInputType == Enum.UserInputType.Touch then
-
-        DraggingSlider = true
-
-    end
-
+-- Slider
+SliderFrame.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then DraggingSlider = true end
 end)
-
-SliderFrame.InputEnded:Connect(function(input)
-
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-
-    or input.UserInputType == Enum.UserInputType.Touch then
-
-        DraggingSlider = false
-
-    end
-
+SliderFrame.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then DraggingSlider = false end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
-
-    if DraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement
-
-    or input.UserInputType == Enum.UserInputType.Touch) then
-
-        local mousePos    = input.Position.X
-
-        local sliderAbsPos = SliderFrame.AbsolutePosition.X
-
-        local sliderWidth  = SliderFrame.AbsoluteSize.X
-
-        local relative = math.clamp((mousePos - sliderAbsPos) / sliderWidth, 0, 1)
-
-        local min = _G.SliderMin or 1
-
-        local max = _G.SliderMax or 250
-
-        Power = math.floor(min + relative * (max - min))
-
-        Fill.Size      = UDim2.new(relative, 0, 1, 0)
-
-        Label.Text     = "Power: " .. Power
-
+    if DraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local rel = math.clamp((input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
+        local mn, mx = _G.SliderMin or 1, _G.SliderMax or 250
+        Power = math.floor(mn + rel * (mx - mn))
+        Fill.Size       = UDim2.new(rel, 0, 1, 0)
+        Label.Text      = "Power: " .. Power
         powerBadge.Text = tostring(Power)
-
     end
-
 end)
 
-
-
--- ╔════════════════════════════════════════════╗
-
--- ║       FE-VISIBLE RAGDOLL HELPERS           ║
-
--- ║  Motor6D.Enabled is replicated from client ║
-
--- ║  so other players see the effect.          ║
-
--- ╚════════════════════════════════════════════╝
-
-
-
-local function applyRagdoll(char)
-
-    for _, v in ipairs(char:GetDescendants()) do
-
-        if v:IsA("Motor6D") then
-
-            v.Enabled = false
-
-        end
-
-    end
-
-end
-
-
-
-local function removeRagdoll(char)
-
-    for _, v in ipairs(char:GetDescendants()) do
-
-        if v:IsA("Motor6D") then
-
-            v.Enabled = true
-
-        end
-
-    end
-
-end
-
-
-
--- ── Keybind ──
-
-hint.Text = "[R] fling  •  [⚙] settings  •  drag to move"
-
-UserInputService.InputBegan:Connect(function(input, gp)
-
-    if gp then return end
-
-    if input.KeyCode == Enum.KeyCode.R then
-
-        doFlingBurst()
-
-    end
-
-end)
-
-
-
+-- =============================================
+--  FLING BURST
+-- =============================================
 local onCooldown = false
-
-
+local flingConn  = nil   -- tracked so respawn can cancel it
 
 local function doFlingBurst()
-
     if onCooldown then return end
-
     if not character or not rootPart or not rootPart.Parent then return end
 
-
-
     onCooldown = true
-
     setCooldownUI(true)
-
-
 
     local intensity = math.max(Power, 1) / 375
 
-
-
-    if Settings.PlatformStand then
-
-        humanoid.PlatformStand = true
-
-    end
-
+    if Settings.PlatformStand then humanoid.PlatformStand = true end
     humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
-
-
-    -- FE-visible ragdoll: disabling Motor6D replicates to all clients
-
-    if Settings.Ragdoll then
-
-        applyRagdoll(character)
-
-    end
-
-
+    -- BallSocket ragdoll (FE-visible)
+    if Settings.Ragdoll then applyRagdoll(character) end
 
     rootPart.AssemblyLinearVelocity = Vector3.new(
-
-        math.random(-Settings.Spread, Settings.Spread) * intensity,
-
+        math.random(-Settings.Spread,  Settings.Spread)  * intensity,
         math.random(Settings.UpForce - 6, Settings.UpForce + 6) * intensity,
-
-        math.random(-Settings.Spread, Settings.Spread) * intensity
-
+        math.random(-Settings.Spread,  Settings.Spread)  * intensity
     ) * 55
 
-
-
     rootPart.AssemblyAngularVelocity = Vector3.new(
-
         math.random(-1000, 1000) * intensity,
-
         math.random(-1500, 1500) * intensity,
-
         math.random(-1000, 1000) * intensity
-
     )
 
-
-
     local spinDuration  = Settings.SpinDuration + math.random() * 0.7
-
     local slowDuration  = Settings.SlowDuration
-
     local spinStart     = tick()
-
     local initialAngVel = rootPart.AssemblyAngularVelocity
 
+    if flingConn then flingConn:Disconnect() end
 
-
-    local conn
-
-    conn = RunService.Heartbeat:Connect(function()
-
+    flingConn = RunService.Heartbeat:Connect(function()
         if not rootPart or not rootPart.Parent then
-
-            conn:Disconnect()
-
+            flingConn:Disconnect(); flingConn = nil
             return
-
         end
-
-
 
         local elapsed = tick() - spinStart
 
-
-
         if elapsed < spinDuration then
-
             -- air phase
 
-
-
         elseif elapsed < spinDuration + slowDuration then
-
             local t = (elapsed - spinDuration) / slowDuration
-
             t = t * t * (3 - 2 * t)
-
             rootPart.AssemblyAngularVelocity = initialAngVel:Lerp(Vector3.zero, t)
 
-
-
         else
-
             rootPart.AssemblyAngularVelocity = Vector3.zero
-
-            conn:Disconnect()
-
-
+            flingConn:Disconnect(); flingConn = nil
 
             if humanoid and humanoid.Parent then
-
                 humanoid.PlatformStand = false
-
-                if Settings.Ragdoll then
-
-                    removeRagdoll(character)
-
+                if Settings.Ragdoll then removeRagdoll(character) end
+                if Settings.SitOnFling then
+                    Settings._sittingActive = true
+                    humanoid.Sit = true
+                else
+                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                 end
-
-                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-
             end
 
-
-
             task.delay(0.5, function()
-
                 onCooldown = false
-
                 setCooldownUI(false)
-
             end)
-
         end
-
     end)
-
 end
-
-
 
 ActionButton.MouseButton1Click:Connect(doFlingBurst)
 
+-- [R] keybind
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.R then doFlingBurst() end
+end)
 
+-- Jump to stand
+UserInputService.JumpRequest:Connect(function()
+    if Settings.SitOnFling and Settings._sittingActive then
+        if humanoid and humanoid.Parent then
+            Settings._sittingActive = false
+            humanoid.Sit = false
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
 
+-- =============================================
+--  CHARACTER RESET
+-- =============================================
 player.CharacterAdded:Connect(function(newChar)
+    -- Cancel any in-flight fling heartbeat
+    if flingConn then flingConn:Disconnect(); flingConn = nil end
 
+    -- Clean up BSC constraints on the OLD character
+    if character then
+        for _, v in ipairs(character:GetDescendants()) do
+            if v.Name:sub(1, #BSC_TAG) == BSC_TAG then pcall(function() v:Destroy() end) end
+        end
+        for _, v in ipairs(character:GetDescendants()) do
+            if v:IsA("Motor6D") then pcall(function() v.Enabled = true end) end
+        end
+    end
+
+    -- Update refs
     character  = newChar
-
     humanoid   = newChar:WaitForChild("Humanoid")
-
     rootPart   = newChar:WaitForChild("HumanoidRootPart")
 
-    onCooldown = false
-
+    -- Reset all state
+    onCooldown             = false
+    Settings._sittingActive = false
     setCooldownUI(false)
 
+    task.wait(0.1)
+    if humanoid and humanoid.Parent then
+        humanoid.PlatformStand = false
+        humanoid.Sit           = false
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
 end)
