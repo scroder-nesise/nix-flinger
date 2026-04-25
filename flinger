@@ -436,7 +436,7 @@ local function makeToggle(text, init, y, onChange)
     local btn = Instance.new("TextButton")
     btn.Size             = UDim2.new(0.36, 0, 0, 22)
     btn.Position         = UDim2.new(0.62, 0, 0, y)
-    btn.BackgroundColor3 = init and Color3.fromRGB(20,40,28) or C.Surface
+    btn.BackgroundColor3 = init and Color3.fromRGB(20, 40, 28) or C.Surface
     btn.Text             = init and "ON" or "OFF"
     btn.TextColor3       = init and C.Green or C.Red
     btn.TextSize         = 11
@@ -449,7 +449,7 @@ local function makeToggle(text, init, y, onChange)
     btn.MouseButton1Click:Connect(function()
         state = not state
         TweenService:Create(btn, TweenInfo.new(0.12), {
-            BackgroundColor3 = state and Color3.fromRGB(20,40,28) or C.Surface
+            BackgroundColor3 = state and Color3.fromRGB(20, 40, 28) or C.Surface
         }):Play()
         TweenService:Create(st, TweenInfo.new(0.12), {
             Color = state and C.Green or C.Border
@@ -462,18 +462,18 @@ end
 
 -- ── FLING ──
 secLabel("FLING", C.Pink, 8)
-makeRow("Spin Duration", 28) makeBox(Settings.SpinDuration, 28, function(v) Settings.SpinDuration = math.clamp(v,0.5,8) end)
-makeRow("Slow Duration", 55) makeBox(Settings.SlowDuration, 55, function(v) Settings.SlowDuration = math.clamp(v,0.1,4) end)
-makeRow("Up Force",      82) makeBox(Settings.UpForce,      82, function(v) Settings.UpForce      = math.clamp(v,5,80)  end)
-makeRow("H. Spread",    109) makeBox(Settings.Spread,      109, function(v) Settings.Spread       = math.clamp(v,1,50)  end)
+makeRow("Spin Duration", 28)  makeBox(Settings.SpinDuration, 28,  function(v) Settings.SpinDuration = math.clamp(v, 0.5, 8)  end)
+makeRow("Slow Duration", 55)  makeBox(Settings.SlowDuration, 55,  function(v) Settings.SlowDuration = math.clamp(v, 0.1, 4)  end)
+makeRow("Up Force",      82)  makeBox(Settings.UpForce,      82,  function(v) Settings.UpForce      = math.clamp(v, 5, 80)   end)
+makeRow("H. Spread",    109)  makeBox(Settings.Spread,       109, function(v) Settings.Spread       = math.clamp(v, 1, 50)   end)
 
 secDiv(136)
 
 -- ── PHYSICS ──
 secLabel("PHYSICS", C.Purple, 141)
 makeToggle("Platform Stand",   Settings.PlatformStand, 161, function(v) Settings.PlatformStand = v end)
-makeToggle("Ragdoll on Fling", Settings.Ragdoll,       188, function(v) Settings.Ragdoll = v        end)
-makeToggle("Sit on Fling",     Settings.SitOnFling,    215, function(v) Settings.SitOnFling = v     end)
+makeToggle("Ragdoll on Fling", Settings.Ragdoll,       188, function(v) Settings.Ragdoll       = v end)
+makeToggle("Sit on Fling",     Settings.SitOnFling,    215, function(v) Settings.SitOnFling    = v end)
 
 local sitHint = Instance.new("TextLabel")
 sitHint.Size              = UDim2.new(1, -16, 0, 14)
@@ -489,7 +489,7 @@ sitHint.Parent            = sScroll
 secDiv(258)
 
 -- ── POWER SLIDER ──
-secLabel("POWER SLIDER", Color3.fromRGB(255,180,50), 263)
+secLabel("POWER SLIDER", Color3.fromRGB(255, 180, 50), 263)
 makeRow("Min Power", 283)
 makeBox(1, 283, function(v)
     _G.SliderMin = v
@@ -514,16 +514,21 @@ sfHint.Parent            = sScroll
 -- Settings drag
 local sfDS, sfDO = nil, nil
 sfTitle.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then sfDS = i.Position; sfDO = SF.Position end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        sfDS = i.Position
+        sfDO = SF.Position
+    end
 end)
 UserInputService.InputChanged:Connect(function(i)
     if sfDS and i.UserInputType == Enum.UserInputType.MouseMovement then
         local d = i.Position - sfDS
-        SF.Position = UDim2.new(sfDO.X.Scale, sfDO.X.Offset+d.X, sfDO.Y.Scale, sfDO.Y.Offset+d.Y)
+        SF.Position = UDim2.new(sfDO.X.Scale, sfDO.X.Offset + d.X, sfDO.Y.Scale, sfDO.Y.Offset + d.Y)
     end
 end)
 sfTitle.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then sfDS = nil end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        sfDS = nil
+    end
 end)
 
 gearBtn.MouseButton1Click:Connect(function() SF.Visible = not SF.Visible end)
@@ -542,13 +547,17 @@ for _, el in ipairs({Frame, header, Title, gearBtn, div, hint}) do
         el.InputBegan:Connect(function(input)
             local t = input.UserInputType
             if (t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch) and not DraggingSlider then
-                fDown = true; fDrag = false; fDS = input.Position; fSP = Frame.Position
+                fDown = true
+                fDrag = false
+                fDS   = input.Position
+                fSP   = Frame.Position
             end
         end)
         el.InputEnded:Connect(function(input)
             local t = input.UserInputType
             if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
-                fDown = false; fDrag = false
+                fDown = false
+                fDrag = false
             end
         end)
     end)
@@ -559,38 +568,40 @@ UserInputService.InputChanged:Connect(function(input)
     if not fDown or DraggingSlider then return end
     if t ~= Enum.UserInputType.MouseMovement and t ~= Enum.UserInputType.Touch then return end
     local delta = input.Position - fDS
-    if not fDrag and (math.abs(delta.X) > DRAG_THRESHOLD or math.abs(delta.Y) > DRAG_THRESHOLD) then fDrag = true end
+    if not fDrag and (math.abs(delta.X) > DRAG_THRESHOLD or math.abs(delta.Y) > DRAG_THRESHOLD) then
+        fDrag = true
+    end
     if fDrag then
-        Frame.Position = UDim2.new(fSP.X.Scale, fSP.X.Offset+delta.X, fSP.Y.Scale, fSP.Y.Offset+delta.Y)
+        Frame.Position = UDim2.new(fSP.X.Scale, fSP.X.Offset + delta.X, fSP.Y.Scale, fSP.Y.Offset + delta.Y)
     end
 end)
 
 -- Slider
 SliderFrame.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then DraggingSlider = true end
-end)
-SliderFrame.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then DraggingSlider = false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if DraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local rel = math.clamp((input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
-
-        local mn = tonumber(_G.SliderMin) or 1
-        local mx = tonumber(_G.SliderMax) or 250
-
-        if mn > mx then
-            mn, mx = mx, mn
-        end
-
-        Power = math.floor(mn + rel * (mx - mn))
-
-        Fill.Size       = UDim2.new(rel, 0, 1, 0)
-        Label.Text      = "Power: " .. Power
-        powerBadge.Text = tostring(Power)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        DraggingSlider = true
     end
 end)
-     
+SliderFrame.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        DraggingSlider = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if not DraggingSlider then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+    local rel = math.clamp((input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
+    local mn  = tonumber(_G.SliderMin) or 1
+    local mx  = tonumber(_G.SliderMax) or 250
+
+    if mn > mx then mn, mx = mx, mn end
+
+    Power           = math.floor(mn + rel * (mx - mn))
+    Fill.Size       = UDim2.new(rel, 0, 1, 0)
+    Label.Text      = "Power: " .. Power
+    powerBadge.Text = tostring(Power)
+end)
 
 -- =============================================
 --  FLING BURST
@@ -614,9 +625,9 @@ local function doFlingBurst()
     if Settings.Ragdoll then applyRagdoll(character) end
 
     rootPart.AssemblyLinearVelocity = Vector3.new(
-        math.random(-Settings.Spread,  Settings.Spread)  * intensity,
+        math.random(-Settings.Spread,  Settings.Spread)      * intensity,
         math.random(Settings.UpForce - 6, Settings.UpForce + 6) * intensity,
-        math.random(-Settings.Spread,  Settings.Spread)  * intensity
+        math.random(-Settings.Spread,  Settings.Spread)      * intensity
     ) * 55
 
     rootPart.AssemblyAngularVelocity = Vector3.new(
@@ -634,7 +645,8 @@ local function doFlingBurst()
 
     flingConn = RunService.Heartbeat:Connect(function()
         if not rootPart or not rootPart.Parent then
-            flingConn:Disconnect(); flingConn = nil
+            flingConn:Disconnect()
+            flingConn = nil
             return
         end
 
@@ -650,11 +662,16 @@ local function doFlingBurst()
 
         else
             rootPart.AssemblyAngularVelocity = Vector3.zero
-            flingConn:Disconnect(); flingConn = nil
+            flingConn:Disconnect()
+            flingConn = nil
 
             if humanoid and humanoid.Parent then
                 humanoid.PlatformStand = false
-                if Settings.Ragdoll then removeRagdoll(character) end
+
+                if Settings.Ragdoll then
+                    removeRagdoll(character)
+                end
+
                 if Settings.SitOnFling then
                     -- Wait until character actually lands before sitting.
                     -- Setting Sit while airborne gets ignored by the engine.
@@ -662,23 +679,18 @@ local function doFlingBurst()
                         local timeout = tick() + 5  -- give up after 5s
                         while tick() < timeout do
                             if not humanoid or not humanoid.Parent then return end
-                            if humanoid.FloorMaterial ~= Enum.Material.Air then
-                                break
-                            end
+                            if humanoid.FloorMaterial ~= Enum.Material.Air then break end
                             task.wait()
                         end
                         if humanoid and humanoid.Parent then
-    humanoid.Sit = false
-    task.wait()
-
-    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-    task.wait()
-
-    humanoid.Sit = true
-    humanoid:ChangeState(Enum.HumanoidStateType.Seated)
-
-    Settings._sittingActive = true
-end
+                            humanoid.Sit = false
+                            task.wait()
+                            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                            task.wait()
+                            humanoid.Sit = true
+                            humanoid:ChangeState(Enum.HumanoidStateType.Seated)
+                            Settings._sittingActive = true
+                        end
                     end)
                 else
                     humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
@@ -718,25 +730,32 @@ end)
 -- =============================================
 player.CharacterAdded:Connect(function(newChar)
     -- Cancel any in-flight fling heartbeat
-    if flingConn then flingConn:Disconnect(); flingConn = nil end
+    if flingConn then
+        flingConn:Disconnect()
+        flingConn = nil
+    end
 
     -- Clean up BSC constraints on the OLD character
     if character then
         for _, v in ipairs(character:GetDescendants()) do
-            if v.Name:sub(1, #BSC_TAG) == BSC_TAG then pcall(function() v:Destroy() end) end
+            if v.Name:sub(1, #BSC_TAG) == BSC_TAG then
+                pcall(function() v:Destroy() end)
+            end
         end
         for _, v in ipairs(character:GetDescendants()) do
-            if v:IsA("Motor6D") then pcall(function() v.Enabled = true end) end
+            if v:IsA("Motor6D") then
+                pcall(function() v.Enabled = true end)
+            end
         end
     end
 
     -- Update refs
-    character  = newChar
-    humanoid   = newChar:WaitForChild("Humanoid")
-    rootPart   = newChar:WaitForChild("HumanoidRootPart")
+    character = newChar
+    humanoid  = newChar:WaitForChild("Humanoid")
+    rootPart  = newChar:WaitForChild("HumanoidRootPart")
 
     -- Reset all state
-    onCooldown             = false
+    onCooldown              = false
     Settings._sittingActive = false
     setCooldownUI(false)
 
